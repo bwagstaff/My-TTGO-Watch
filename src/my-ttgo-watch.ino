@@ -33,7 +33,9 @@
 #include "hardware/motor.h"
 #include "hardware/wifictl.h"
 
+#include "app/games/ttt/ttt_tile.h"
 #include "app/weather/weather.h"
+
 
 TTGOClass *ttgo = TTGOClass::getWatch();
 
@@ -74,6 +76,7 @@ void setup()
      * add apps and widgets here!!!
      */
     weather_app_setup();
+    tic_tac_toe_app_setup();
     /*
      *
      */
