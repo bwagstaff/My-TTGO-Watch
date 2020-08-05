@@ -30,14 +30,14 @@
 #include "hardware/display.h"
 #include "hardware/motor.h"
 
-#include "ttt_tile.h"
+#include "ttt_app.h"
 #include "ttt.h"
 
 // Use these images (extern objects)
 LV_IMG_DECLARE(exit_32px);
 LV_IMG_DECLARE(move_64px);
 
-static TicTacToeTile tileInstance;
+static TicTacToeApp tileInstance;
 
 void tic_tac_toe_app_setup(){
     tileInstance.SetupTile();
@@ -63,14 +63,14 @@ static void exitGame(struct _lv_obj_t *obj, lv_event_t event)
     }
 }
 
-TicTacToeTile::TicTacToeTile()
+TicTacToeApp::TicTacToeApp()
 {
     pAppname = "Tic Tac Toe";
     pMenuIcon = &move_64px;
     pStartFunction = startGame;
 }
 
-void TicTacToeTile::OnRegistered()
+void TicTacToeApp::OnRegistered()
 {
     // Have our app display an exit button.
     lv_obj_t *exit_btn = lv_imgbtn_create(pTile, NULL);
@@ -83,14 +83,14 @@ void TicTacToeTile::OnRegistered()
     lv_obj_set_event_cb(exit_btn, exitGame);
 }
 
-void TicTacToeTile::OnStartClicked()
+void TicTacToeApp::OnStartClicked()
 {
     motor_vibe(1);
     mainbar_jump_to_tilenumber(mTileId, LV_ANIM_OFF);
     mGameInstance = std::make_unique<TTT>(this);
 }
 
-void TicTacToeTile::OnExitClicked()
+void TicTacToeApp::OnExitClicked()
 {
     mGameInstance.release();
     motor_vibe(1);

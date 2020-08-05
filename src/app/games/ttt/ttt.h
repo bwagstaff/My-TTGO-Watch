@@ -21,14 +21,14 @@
 
 #pragma once
 
-class TicTacToeTile;
+class TicTacToeApp;
 
 class TTT
 {
 private:
     static constexpr int NUM_SQUARES = 9;
 
-    TicTacToeTile *mParent = 0;
+    TicTacToeApp *mParent = 0;
 
     enum Owner : uint8_t
     {
@@ -38,7 +38,7 @@ private:
     };
 
     // Gameplay data
-    TicTacToeTile *parent;
+    TicTacToeApp *parent;
     TTT::Owner mBoard[NUM_SQUARES];
     TTT::Owner mCurrentPlayer = Red;
 
@@ -61,7 +61,7 @@ private:
     }
 
 public:
-    TTT(TicTacToeTile *parent);
+    TTT(TicTacToeApp *parent);
     ~TTT();
 
     void TileClicked(int buttonNumber);

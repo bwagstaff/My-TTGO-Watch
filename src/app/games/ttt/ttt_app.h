@@ -27,13 +27,13 @@ void tic_tac_toe_app_setup();
 
 class TTT;
 
-class TicTacToeTile : public gamebase
+class TicTacToeApp : public gamebase
 {
     std::unique_ptr<TTT> mGameInstance;
     void OnRegistered() override;
 
 public:
-    TicTacToeTile();
+    TicTacToeApp();
 
     // Respond to callback
     void OnStartClicked();

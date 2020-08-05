@@ -28,7 +28,7 @@
 #include "hardware/display.h"
 #include "hardware/motor.h"
 
-#include "ttt_tile.h"
+#include "ttt_app.h"
 #include "ttt.h"
 
 /* These would be so much better if LVGL supported a data param. Oh well, one for each.*/
@@ -116,7 +116,7 @@ static void OnSquareBR(struct _lv_obj_t *obj, lv_event_t event)
     }
 }
 
-TTT::TTT(TicTacToeTile *parent)
+TTT::TTT(TicTacToeApp *parent)
 {
     gameInstance = this;
     mParent = parent;

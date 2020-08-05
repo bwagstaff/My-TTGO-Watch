@@ -33,7 +33,7 @@
 #include "hardware/motor.h"
 #include "hardware/wifictl.h"
 
-#include "app/games/ttt/ttt_tile.h"
+#include "app/games/ttt/ttt_app.h"
 #include "app/weather/weather.h"
 
 
