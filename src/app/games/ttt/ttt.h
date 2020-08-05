@@ -1,4 +1,4 @@
-/*   July 31 21:33:35 2020
+/*   July 31 21:21:07 2020
  *   Copyright  2020  Bryan Wagstaff
  *   Email: programmer@bryanwagstaff.com
  ****************************************************************************/
@@ -21,23 +21,49 @@
 
 #pragma once
 
-#include "app\games\gamebase.h"
+class TicTacToeTile;
 
-void tic_tac_toe_app_setup();
-
-class TTT;
-
-class TicTacToeTile : public gamebase
+class TTT
 {
-    std::unique_ptr<TTT> mGameInstance;
-    void OnRegistered() override;
+private:
+    static constexpr int NUM_SQUARES = 9;
+
+    TicTacToeTile *mParent = 0;
+
+    enum Owner : uint8_t
+    {
+        None = 0,
+        Red = 'X',
+        Blue = 'O',
+    };
+
+    // Gameplay data
+    TicTacToeTile *parent;
+    TTT::Owner mBoard[NUM_SQUARES];
+    TTT::Owner mCurrentPlayer = Red;
+
+    // Visual data
+    lv_style_t mStyleRed;
+    lv_style_t mStyleBlue;
+    lv_style_t mStyleBlank;
+    lv_obj_t *mButtons[NUM_SQUARES] = {0};
+
+    void NextPlayer()
+    {
+        if (mCurrentPlayer == Red)
+        {
+            mCurrentPlayer = Blue;
+        }
+        else
+        {
+            mCurrentPlayer = Red;
+        }
+    }
 
 public:
-    TicTacToeTile();
+    TTT(TicTacToeTile *parent);
+    ~TTT();
 
-    // Respond to callback
-    void OnStartClicked();
-
-    // Respond to callback
-    void OnExitClicked();
+    void TileClicked(int buttonNumber);
+    void ClearBoard();
 };

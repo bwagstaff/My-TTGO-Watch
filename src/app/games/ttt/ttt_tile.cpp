@@ -21,6 +21,8 @@
 
 #include "config.h"
 #include <Arduino.h>
+#include <memory>
+#include <utility>
 
 #include "gui/mainbar/mainbar.h"
 #include "gui/mainbar/app_tile/app_tile.h"
@@ -35,10 +37,10 @@
 LV_IMG_DECLARE(exit_32px);
 LV_IMG_DECLARE(move_64px);
 
-TicTacToeTile gameInstance;
+static TicTacToeTile tileInstance;
 
 void tic_tac_toe_app_setup(){
-    gameInstance.SetupTile();
+    tileInstance.SetupTile();
 }
 
 static void startGame(struct _lv_obj_t *obj, lv_event_t event)
@@ -46,7 +48,7 @@ static void startGame(struct _lv_obj_t *obj, lv_event_t event)
     switch (event)
     {
     case (LV_EVENT_CLICKED):
-        gameInstance.OnStartClicked();
+        tileInstance.OnStartClicked();
         break;
     }
 }
@@ -56,7 +58,7 @@ static void exitGame(struct _lv_obj_t *obj, lv_event_t event)
     switch (event)
     {
     case (LV_EVENT_CLICKED):
-        gameInstance.OnExitClicked();
+        tileInstance.OnExitClicked();
         break;
     }
 }
@@ -85,10 +87,12 @@ void TicTacToeTile::OnStartClicked()
 {
     motor_vibe(1);
     mainbar_jump_to_tilenumber(mTileId, LV_ANIM_OFF);
+    mGameInstance = std::make_unique<TTT>(this);
 }
 
 void TicTacToeTile::OnExitClicked()
 {
+    mGameInstance.release();
     motor_vibe(1);
     mainbar_jump_to_tilenumber(app_tile_get_tile_num(), LV_ANIM_OFF);
 }

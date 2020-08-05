@@ -53,5 +53,7 @@ class gamebase
 
     public:
         void SetupTile();
-
+        
+        uint32_t GetTileId() { return mTileId; }
+        lv_obj_t *GetTile() { return pTile; }
 };
