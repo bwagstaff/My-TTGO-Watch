@@ -21,39 +21,36 @@
 
 #pragma once
 
-class gamebase
+#include <vector>
+
+class GameBase
 {
-    private:
+private:
+    // Tile management
+    lv_obj_t *mTileView = 0;
+    std::vector<lv_obj_t *> mTiles;
+    std::vector<lv_point_t> mTilePositions; // pointer kept inside LVGM after tiles created.
+    int mTilesX = 0;
+    int mTilesY = 0;
 
-        /* Called when the tile is successfully registered at startup. 
-        */
-        virtual void OnRegistered() {};
-
-    protected:
-        // Set these during construction, used in DoRegisterTile
-        const lv_img_dsc_t *pMenuIcon = 0;
-        const char *pAppname = 0;
-        lv_event_cb_t pStartFunction = 0;
-
-        // Tile object created at system startup, must be persistent.
-        lv_obj_t *pTile = 0;   // Tile for my application
-        uint32_t mTileId;       // ID for my application tile
-        lv_style_t mTileStyle; // visual style for tile icon
-
-        /* Register this tile on the menu
-    @param xpos Position on the menu. TODO: make this automatic, remove
-    @param ypos Position on the menu. TODO: make this automatic, remove
-    @param startEvent Static function (couldn't avoid it) to call when the app starts.
-    @return True on successful registration. False means errors with registration, check the log.
+protected:
+    /* Create tiles for this application
+    @param xCount number of tiles wide, must be at least 1
+    @param yCount number of tiles tall, must be at least 1
+    @return True on successful creation. False means errors with registration, check the log.
     */
-        bool DoRegisterTile(int xpos, int ypos);
+    bool AllocateAppTiles(int xCount, int yCount);
+    /* Release app tiles */
+    void FreeAppTiles();
+    /* Get allocated tile by index */
+    lv_obj_t *GetTile(int idx) { return mTiles[idx]; }
+    /* Get allocated tile by sliding position */
+    lv_obj_t *GetTile(int x, int y) { return mTiles[y * mTilesX + x]; };
+    /* Get the view associated with the application tiles */
+    lv_obj_t *GetTileView() { return mTileView; }
 
-        /* Call to return control to the parent tile. Still need to clean up your stuff. */
-        void ExitApp();
+public:
+    GameBase(){};
+    virtual ~GameBase();
 
-    public:
-        void SetupTile();
-        
-        uint32_t GetTileId() { return mTileId; }
-        lv_obj_t *GetTile() { return pTile; }
 };

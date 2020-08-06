@@ -21,62 +21,76 @@
 
 #include "config.h"
 #include "gui/mainbar/mainbar.h"
-#include "gui/mainbar/app_tile/app_tile.h" //TODO: Swap this with a game tile
+#include "gui/mainbar/app_tile/app_tile.h" //TODO: Swap this with a game app tile
 #include "gamebase.h"
 
-bool gamebase::DoRegisterTile(int xpos, int ypos)
+GameBase::~GameBase()
 {
-    if (!pAppname || !pMenuIcon || !pStartFunction)
-    {
-        log_e("Class is not properly configured.");
-        return false;
-    }
-    // get an app tile and copy mainstyle
-    mTileId = mainbar_add_app_tile(xpos, ypos);
-    if(mTileId == -1)
-    {
-        log_e("Could not get tile ID");
-        return false;
-    }
-    pTile = mainbar_get_tile_obj(mTileId);
-    if(!pTile)
-    {
-        log_e("Could not create tile");
-        return false;
-    }
-    lv_style_copy(&mTileStyle, mainbar_get_style());
-    lv_style_set_bg_color(&mTileStyle, LV_OBJ_PART_MAIN, LV_COLOR_GRAY);
-    lv_style_set_bg_opa(&mTileStyle, LV_OBJ_PART_MAIN, LV_OPA_100);
-    lv_style_set_border_width(&mTileStyle, LV_OBJ_PART_MAIN, 0);
-    lv_obj_add_style(pTile, LV_OBJ_PART_MAIN, &mTileStyle);
+    FreeAppTiles();
+}
 
-    // register an icon and set callback
-    lv_obj_t *app = app_tile_register_app(pAppname); //TODO: have a game tile instead of app tile
-    if(!app)
+bool GameBase::AllocateAppTiles(int xCount, int yCount)
+{
+    if (xCount < 1 || yCount < 1)
     {
-        log_e("Could not register");
+        log_e("Must have at least one tile in each dimension");
         return false;
     }
-    lv_obj_t *image = lv_imgbtn_create(app, NULL);
-    lv_imgbtn_set_src(image, LV_BTN_STATE_RELEASED, pMenuIcon);
-    lv_imgbtn_set_src(image, LV_BTN_STATE_PRESSED, pMenuIcon);
-    lv_imgbtn_set_src(image, LV_BTN_STATE_CHECKED_RELEASED, pMenuIcon);
-    lv_imgbtn_set_src(image, LV_BTN_STATE_CHECKED_PRESSED, pMenuIcon);
-    lv_obj_add_style(image, LV_IMGBTN_PART_MAIN, mainbar_get_style());
-    lv_obj_align(image, NULL, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_set_event_cb(image, pStartFunction);
+    if (mTileView || mTiles.size() != 0)
+    {
+        log_e("App already contains tiles.");
+        return false;
+    }
 
-    OnRegistered();
+    mTileView = lv_tileview_create(lv_scr_act(), NULL);
+    if (!mTileView)
+    {
+        log_e("Couldn't create tile view");
+        return false;
+    }
+    mTilesX = xCount;
+    mTilesY = yCount;
+
+    const int numtiles = xCount * yCount;
+    mTiles.resize(numtiles);
+    mTilePositions.resize(numtiles);
+
+    // Prepare "valid positions" array
+    for (int i = 0; i < numtiles; i++)
+    {
+        mTilePositions[i].x = i % xCount;
+        mTilePositions[i].y = i / xCount;
+    }
+
+    // Allocate all the tiles.
+    for (int i = 0; i < numtiles; i++)
+    {
+        mTiles[i] = lv_obj_create(mTileView, NULL);
+        if (!mTiles[i])
+            log_e("Error creating tile %d. Crashing...", i);
+        lv_obj_set_size(mTiles[i], LV_HOR_RES, LV_VER_RES);
+
+        lv_obj_set_pos(mTiles[i], mTilePositions[i].x * LV_HOR_RES, mTilePositions[i].y * LV_VER_RES);
+        lv_tileview_add_element(mTileView, mTiles[i]);
+    }
+
+    lv_tileview_set_valid_positions(mTileView, mTilePositions.data(), mTilePositions.size());
+    lv_tileview_set_edge_flash(mTileView, false);
 
     return true;
 }
 
-void gamebase::SetupTile()
+void GameBase::FreeAppTiles()
 {
-    DoRegisterTile(2, 1);
-}
-
-void gamebase::ExitApp()
-{
-    mainbar_jump_to_tilenumber(app_tile_get_tile_num(), LV_ANIM_OFF); //TODO: have a game tile instead of app tile
+    if (mTileView)
+    {
+        lv_obj_clean(mTileView);
+        lv_obj_del(mTileView);
+    }
+    // All the tiles are owned by the tileview, so just dump the pointers.
+    mTileView = 0;
+    mTiles.clear();
+    mTilePositions.clear();
+    mTilesX = 0;
+    mTilesY = 0;
 }

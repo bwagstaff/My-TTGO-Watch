@@ -25,19 +25,49 @@
 
 void tic_tac_toe_app_setup();
 
-class TTT;
+class TicTacToeIcon;
 
-class TicTacToeApp : public gamebase
+class TicTacToeApp : public GameBase
 {
-    std::unique_ptr<TTT> mGameInstance;
-    void OnRegistered() override;
+
+private:
+    static constexpr int NUM_SQUARES = 9;
+
+    TicTacToeIcon *mParentIcon = 0;
+
+    enum Owner : uint8_t
+    {
+        None = 0,
+        Red = 'X',
+        Blue = 'O',
+    };
+
+    // Gameplay data
+    Owner mBoard[NUM_SQUARES];
+    Owner mCurrentPlayer = Red;
+
+    // Visual data
+    lv_style_t mStyleApp;
+    lv_style_t mStyleMenu;
+    lv_style_t mStyleRed;
+    lv_style_t mStyleBlue;
+    lv_style_t mStyleBlank;
+    lv_obj_t *mButtons[NUM_SQUARES] = {0};
+
+    void NextPlayer() { mCurrentPlayer = (mCurrentPlayer == Red) ? Blue : Red; };
 
 public:
-    TicTacToeApp();
+    TicTacToeApp(TicTacToeIcon* callingIcon);
+    ~TicTacToeApp();
 
-    // Respond to callback
-    void OnStartClicked();
+    void ClearBoard();
 
-    // Respond to callback
+    // Launch from watch mainbar
+    void OnLaunch();
+
+    // Menu Callbacks
     void OnExitClicked();
+
+    // TTT square pressed
+    void TileClicked(int index);
 };

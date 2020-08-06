@@ -1,4 +1,4 @@
-/*   July 31 21:21:07 2020
+/*   Aug 5 16:03:06 2020
  *   Copyright  2020  Bryan Wagstaff
  *   Email: programmer@bryanwagstaff.com
  ****************************************************************************/
@@ -21,49 +21,22 @@
 
 #pragma once
 
+#include "app/games/GameIconBase.h"
+#include "memory"
+
+/* plain function for main app to configure. */
+void tic_tac_toe_game_setup();
+
 class TicTacToeApp;
 
-class TTT
+class TicTacToeIcon : public GameIconBase
 {
 private:
-    static constexpr int NUM_SQUARES = 9;
-
-    TicTacToeApp *mParent = 0;
-
-    enum Owner : uint8_t
-    {
-        None = 0,
-        Red = 'X',
-        Blue = 'O',
-    };
-
-    // Gameplay data
-    TicTacToeApp *parent;
-    TTT::Owner mBoard[NUM_SQUARES];
-    TTT::Owner mCurrentPlayer = Red;
-
-    // Visual data
-    lv_style_t mStyleRed;
-    lv_style_t mStyleBlue;
-    lv_style_t mStyleBlank;
-    lv_obj_t *mButtons[NUM_SQUARES] = {0};
-
-    void NextPlayer()
-    {
-        if (mCurrentPlayer == Red)
-        {
-            mCurrentPlayer = Blue;
-        }
-        else
-        {
-            mCurrentPlayer = Red;
-        }
-    }
+    std::unique_ptr<TicTacToeApp> mGameInstance;
 
 public:
-    TTT(TicTacToeApp *parent);
-    ~TTT();
-
-    void TileClicked(int buttonNumber);
-    void ClearBoard();
+    TicTacToeIcon();
+    void OnStartClicked();
+    void OnExitClicked();
+    void DoDelayedRelease();
 };

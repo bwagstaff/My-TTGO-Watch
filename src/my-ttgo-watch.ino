@@ -33,7 +33,7 @@
 #include "hardware/motor.h"
 #include "hardware/wifictl.h"
 
-#include "app/games/ttt/ttt_app.h"
+#include "app/games/ttt/ttt_icon.h"
 #include "app/weather/weather.h"
 
 
@@ -76,7 +76,7 @@ void setup()
      * add apps and widgets here!!!
      */
     weather_app_setup();
-    tic_tac_toe_app_setup();
+    tic_tac_toe_game_setup();
     /*
      *
      */
