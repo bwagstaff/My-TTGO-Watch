@@ -26,13 +26,13 @@
 #include <HTTPUpdate.h>
 
 #include "update.h"
+#include "update_setup.h"
 #include "update_check_version.h"
 
 #include "gui/mainbar/mainbar.h"
 #include "gui/mainbar/setup_tile/setup.h"
 #include "gui/statusbar.h"
 #include "hardware/display.h"
-#include "hardware/motor.h"
 
 EventGroupHandle_t update_event_handle = NULL;
 TaskHandle_t _update_Task;
@@ -47,18 +47,23 @@ lv_obj_t *update_status_label = NULL;
 lv_obj_t *update_setup_icon_cont = NULL;
 lv_obj_t *update_info_img = NULL;
 
+static void enter_update_setup_setup_event_cb( lv_obj_t * obj, lv_event_t event );
 static void enter_update_setup_event_cb( lv_obj_t * obj, lv_event_t event );
 static void exit_update_setup_event_cb( lv_obj_t * obj, lv_event_t event );
 static void update_event_handler(lv_obj_t * obj, lv_event_t event );
 
 LV_IMG_DECLARE(exit_32px);
+LV_IMG_DECLARE(setup_32px);
 LV_IMG_DECLARE(update_64px);
 LV_IMG_DECLARE(info_1_16px);
 
 void update_tile_setup( void ) {
     // get an app tile and copy mainstyle
-    update_tile_num = mainbar_add_app_tile( 1, 1 );
+    update_tile_num = mainbar_add_app_tile( 1, 2 );
     update_settings_tile = mainbar_get_tile_obj( update_tile_num );
+
+    update_setup_tile_setup( update_tile_num + 1 );
+
     lv_style_copy( &update_settings_style, mainbar_get_style() );
     lv_style_set_bg_color( &update_settings_style, LV_OBJ_PART_MAIN, LV_COLOR_GRAY);
     lv_style_set_bg_opa( &update_settings_style, LV_OBJ_PART_MAIN, LV_OPA_100);
@@ -80,6 +85,15 @@ void update_tile_setup( void ) {
     lv_img_set_src( update_info_img, &info_1_16px );
     lv_obj_align( update_info_img, update_setup_icon_cont, LV_ALIGN_IN_TOP_RIGHT, 0, 0 );
     lv_obj_set_hidden( update_info_img, true );
+
+    lv_obj_t *setup_btn = lv_imgbtn_create( update_settings_tile, NULL);
+    lv_imgbtn_set_src( setup_btn, LV_BTN_STATE_RELEASED, &setup_32px);
+    lv_imgbtn_set_src( setup_btn, LV_BTN_STATE_PRESSED, &setup_32px);
+    lv_imgbtn_set_src( setup_btn, LV_BTN_STATE_CHECKED_RELEASED, &setup_32px);
+    lv_imgbtn_set_src( setup_btn, LV_BTN_STATE_CHECKED_PRESSED, &setup_32px);
+    lv_obj_add_style( setup_btn, LV_IMGBTN_PART_MAIN, &update_settings_style );
+    lv_obj_align( setup_btn, update_settings_tile, LV_ALIGN_IN_TOP_RIGHT, -10, STATUSBAR_HEIGHT + 10 );
+    lv_obj_set_event_cb( setup_btn, enter_update_setup_setup_event_cb );
 
     lv_obj_t *exit_btn = lv_imgbtn_create( update_settings_tile, NULL);
     lv_imgbtn_set_src( exit_btn, LV_BTN_STATE_RELEASED, &exit_32px);
@@ -121,31 +135,37 @@ void update_tile_setup( void ) {
 
     // regster callback
     WiFi.onEvent( [](WiFiEvent_t event, WiFiEventInfo_t info) {
-        update_check_version();
+        if ( update_setup_get_autosync() ) {
+            update_check_version();
+        }
     }, WiFiEvent_t::SYSTEM_EVENT_STA_GOT_IP );
 
     update_event_handle = xEventGroupCreate();
     xEventGroupClearBits( update_event_handle, UPDATE_REQUEST );
 }
 
+static void enter_update_setup_setup_event_cb( lv_obj_t * obj, lv_event_t event ) {
+    switch( event ) {
+        case( LV_EVENT_CLICKED ):       mainbar_jump_to_tilenumber( update_tile_num + 1, LV_ANIM_OFF );
+                                        break;
+    }
+}
+
 static void enter_update_setup_event_cb( lv_obj_t * obj, lv_event_t event ) {
     switch( event ) {
-        case( LV_EVENT_CLICKED ):       motor_vibe( 1 );
-                                        mainbar_jump_to_tilenumber( update_tile_num, LV_ANIM_OFF );
+        case( LV_EVENT_CLICKED ):       mainbar_jump_to_tilenumber( update_tile_num, LV_ANIM_OFF );
                                         break;
     }
 }
 static void exit_update_setup_event_cb( lv_obj_t * obj, lv_event_t event ) {
     switch( event ) {
-        case( LV_EVENT_CLICKED ):       motor_vibe( 1 );
-                                        mainbar_jump_to_tilenumber( setup_get_tile_num(), LV_ANIM_OFF );
+        case( LV_EVENT_CLICKED ):       mainbar_jump_to_tilenumber( setup_get_tile_num(), LV_ANIM_OFF );
                                         break;
     }
 }
 
 static void update_event_handler(lv_obj_t * obj, lv_event_t event) {
     if(event == LV_EVENT_CLICKED) {
-        motor_vibe( 1 );
         if ( xEventGroupGetBits( update_event_handle) & ( UPDATE_GET_VERSION_REQUEST | UPDATE_REQUEST ) )  {
             return;
         }
@@ -169,7 +189,7 @@ void update_check_version( void ) {
         xEventGroupSetBits( update_event_handle, UPDATE_GET_VERSION_REQUEST );
         xTaskCreate(    update_Task,        /* Function to implement the task */
                         "update Task",      /* Name of the task */
-                        2000,               /* Stack size in words */
+                        5000,               /* Stack size in words */
                         NULL,               /* Task input parameter */
                         1,                  /* Priority of the task */
                         &_update_Task );    /* Task handle. */

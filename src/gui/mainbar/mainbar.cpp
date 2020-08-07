@@ -28,6 +28,7 @@
 #include "note_tile/note_tile.h"
 #include "app_tile/app_tile.h"
 #include "gui/keyboard.h"
+#include "gui/statusbar.h"
 
 #include "setup_tile/battery_settings/battery_settings.h"
 #include "setup_tile/wlan_settings/wlan_settings.h"
@@ -38,6 +39,7 @@
 
 static lv_style_t mainbar_style;
 static lv_style_t mainbar_switch_style;
+static lv_style_t mainbar_slider_style;
 
 static lv_obj_t *mainbar = NULL;
 
@@ -58,6 +60,9 @@ void mainbar_setup( void ) {
     lv_style_init( &mainbar_switch_style  );
     lv_style_set_bg_color( &mainbar_switch_style, LV_STATE_CHECKED, LV_COLOR_GREEN );
 
+    lv_style_init( &mainbar_slider_style  );
+    lv_style_set_bg_color( &mainbar_slider_style, LV_STATE_DEFAULT, LV_COLOR_GREEN );
+
     mainbar = lv_tileview_create( lv_scr_act(), NULL);
     lv_tileview_set_valid_positions(mainbar, tile_pos_table, tile_entrys );
     lv_tileview_set_edge_flash( mainbar, false);
@@ -71,16 +76,33 @@ uint32_t mainbar_add_tile( uint16_t x, uint16_t y ) {
 
     if ( tile_pos_table == NULL ) {
         tile_pos_table = ( lv_point_t * )malloc( sizeof( lv_point_t ) * tile_entrys );
+        if ( tile_pos_table == NULL ) {
+            log_e("tile_pos_table malloc faild");
+            while(true);
+        }
         tile = ( lv_tile_t * )malloc( sizeof( lv_tile_t ) * tile_entrys );
+        if ( tile == NULL ) {
+            log_e("tile malloc faild");
+            while(true);
+        }
     }
     else {
-        tile_pos_table = ( lv_point_t * )realloc( tile_pos_table, sizeof( lv_point_t ) * tile_entrys );
-        tile = ( lv_tile_t * )realloc( tile, sizeof( lv_tile_t ) * tile_entrys );
-    }
+        lv_point_t *new_tile_pos_table;
+        lv_tile_t *new_tile;
 
-    if ( tile_pos_table == NULL || tile == NULL ) {
-        log_e("memory alloc faild");
-        while(true);
+        new_tile_pos_table = ( lv_point_t * )realloc( tile_pos_table, sizeof( lv_point_t ) * tile_entrys );
+        if ( new_tile_pos_table == NULL ) {
+            log_e("tile_pos_table realloc faild");
+            while(true);
+        }
+        tile_pos_table = new_tile_pos_table;
+        
+        new_tile = ( lv_tile_t * )realloc( tile, sizeof( lv_tile_t ) * tile_entrys );
+        if ( new_tile == NULL ) {
+            log_e("tile realloc faild");
+            while(true);
+        }
+        tile = new_tile;
     }
 
     tile_pos_table[ tile_entrys - 1 ].x = x;
@@ -107,6 +129,9 @@ lv_style_t *mainbar_get_switch_style( void ) {
     return( &mainbar_switch_style );
 }
 
+lv_style_t *mainbar_get_slider_style( void ) {
+    return( &mainbar_slider_style );
+}
 
 uint32_t mainbar_add_app_tile( uint16_t x, uint16_t y ) {
     uint32_t retval = -1;
@@ -136,6 +161,7 @@ lv_obj_t *mainbar_get_tile_obj( uint32_t tile_number ) {
 }
 
 void mainbar_jump_to_maintile( lv_anim_enable_t anim ) {
+    statusbar_hide( false );
     if ( tile_entrys != 0 ) {
         lv_tileview_set_tile_act( mainbar, 0, 0, anim );
     }

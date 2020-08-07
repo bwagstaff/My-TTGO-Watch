@@ -24,7 +24,10 @@
 #include <soc/rtc.h>
 #include <WiFi.h>
 #include <esp_wifi.h>
+#include <esp_bt.h>
+#include <esp_bt_main.h>
 #include <time.h>
+#include "driver/adc.h"
 
 #include "pmu.h"
 #include "bma.h"
@@ -34,6 +37,7 @@
 #include "motor.h"
 #include "touch.h"
 #include "display.h"
+#include "sound.h"
 
 #include "gui/mainbar/mainbar.h"
 
@@ -52,6 +56,7 @@ void powermgm_setup( TTGOClass *ttgo ) {
     wifictl_setup();
     timesync_setup( ttgo );
     touch_setup( ttgo );
+    sound_setup();
 }
 
 /*
@@ -70,48 +75,44 @@ void powermgm_loop( TTGOClass *ttgo ) {
 
         if ( powermgm_get_event( POWERMGM_STANDBY ) ) {
             powermgm_clear_event( POWERMGM_STANDBY );
-            ttgo->power->setDCDC3Voltage( 3300 );
-            // normal wake up from standby
-            if ( powermgm_get_event( POWERMGM_PMU_BUTTON | POWERMGM_PMU_BATTERY | POWERMGM_BMA_WAKEUP ) ) {
-                log_i("wakeup");
-                display_go_wakeup( ttgo );
-                motor_vibe( 1 );
-            }
-            // silence wakeup request from standby
-            else if ( powermgm_get_event( POWERMGM_SILENCE_WAKEUP_REQUEST ) ) {
-                log_i("silence wakeup");
-                display_go_silence_wakeup( ttgo );
-                powermgm_set_event( POWERMGM_SILENCE_WAKEUP );
-            }
+
+            log_i("go wakeup");
+
+            pmu_wakeup();
+            bma_wakeup();
+            display_wakeup();
+
             timesyncToSystem();
             ttgo->startLvglTick();
-            mainbar_jump_to_maintile( LV_ANIM_OFF );
             lv_disp_trig_activity(NULL);
-            if ( bma_get_config( BMA_STEPCOUNTER ) )
-                ttgo->bma->enableStepCountInterrupt( true );
-            wifictl_on();         
-            ttgo->power->clearTimerStatus();
-            ttgo->power->offTimer();
+
+            wifictl_wakeup();
         }        
         else {
-            log_i("go to standby");
-            display_go_sleep( ttgo );
-            timesyncToRTC();
-            if ( powermgm_get_event( POWERMGM_WIFI_ACTIVE ) ) wifictl_off();
-            while( powermgm_get_event( POWERMGM_WIFI_ACTIVE | POWERMGM_WIFI_CONNECTED | POWERMGM_WIFI_OFF_REQUEST | POWERMGM_WIFI_ON_REQUEST | POWERMGM_WIFI_SCAN ) ) { yield(); }
+            display_standby();
+            mainbar_jump_to_maintile( LV_ANIM_OFF );
+
             ttgo->stopLvglTick();
-            if ( bma_get_config( BMA_STEPCOUNTER ) )
-                ttgo->bma->enableStepCountInterrupt( false );
+            timesyncToRTC();
+
+            bma_standby();
+            pmu_standby();
+            wifictl_standby();
+
             powermgm_set_event( POWERMGM_STANDBY );
             powermgm_clear_event( POWERMGM_SILENCE_WAKEUP );
-            ttgo->power->setDCDC3Voltage( 3000 );
-            ttgo->power->clearTimerStatus();
-            ttgo->power->setTimer( 60 );
-            setCpuFrequencyMhz( 10 );
-            gpio_wakeup_enable ((gpio_num_t)AXP202_INT, GPIO_INTR_LOW_LEVEL);
-            gpio_wakeup_enable ((gpio_num_t)BMA423_INT1, GPIO_INTR_HIGH_LEVEL);
+
+            adc_power_off();
+
+            log_i("go standby");
+
+            setCpuFrequencyMhz( 80 );
+            gpio_wakeup_enable ( (gpio_num_t)AXP202_INT, GPIO_INTR_LOW_LEVEL );
+            gpio_wakeup_enable ( (gpio_num_t)BMA423_INT1, GPIO_INTR_HIGH_LEVEL );
             esp_sleep_enable_gpio_wakeup ();
             esp_light_sleep_start();
+            // from here, the consumption is round about 2.5mA
+            // total standby time is 152h (6days) without use?
         }
         // clear event
         powermgm_clear_event( POWERMGM_PMU_BUTTON | POWERMGM_PMU_BATTERY | POWERMGM_BMA_WAKEUP | POWERMGM_STANDBY_REQUEST | POWERMGM_SILENCE_WAKEUP_REQUEST );

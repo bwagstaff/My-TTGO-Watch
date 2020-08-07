@@ -29,10 +29,13 @@
 #include "gui/statusbar.h"
 
 EventGroupHandle_t bma_event_handle = NULL;
-
-void IRAM_ATTR  bma_irq( void );
-
 bma_config_t bma_config[ BMA_CONFIG_NUM ];
+
+__NOINIT_ATTR uint32_t stepcounter_valid;
+__NOINIT_ATTR uint32_t stepcounter_before_reset;
+__NOINIT_ATTR uint32_t stepcounter;
+
+void IRAM_ATTR bma_irq( void );
 
 /*
  *
@@ -45,6 +48,15 @@ void bma_setup( TTGOClass *ttgo ) {
         bma_config[ i ].enable = true;
     }
 
+    if ( stepcounter_valid != 0xa5a5a5a5 ) {
+      stepcounter = 0;
+      stepcounter_before_reset = 0;
+      stepcounter_valid = 0xa5a5a5a5;
+      log_i("stepcounter not valid. reset");
+    }
+
+    stepcounter = stepcounter + stepcounter_before_reset;
+
     bma_read_config();
 
     ttgo->bma->begin();
@@ -55,6 +67,28 @@ void bma_setup( TTGOClass *ttgo ) {
     attachInterrupt( BMA423_INT1, bma_irq, RISING );
 
     bma_reload_settings();
+}
+
+void bma_standby( void ) {
+  TTGOClass *ttgo = TTGOClass::getWatch();
+
+  log_i("standby");
+
+  if ( bma_get_config( BMA_STEPCOUNTER ) )
+      ttgo->bma->enableStepCountInterrupt( false );
+
+}
+
+void bma_wakeup( void ) {
+  TTGOClass *ttgo = TTGOClass::getWatch();
+
+  log_i("wakeup");
+
+  if ( bma_get_config( BMA_STEPCOUNTER ) )
+    ttgo->bma->enableStepCountInterrupt( true );
+
+  stepcounter_before_reset = ttgo->bma->getCounter();
+  statusbar_update_stepcounter( stepcounter + ttgo->bma->getCounter() );
 }
 
 /*
@@ -80,7 +114,6 @@ void IRAM_ATTR  bma_irq( void ) {
     {
         portYIELD_FROM_ISR ();
     }
-    // rtc_clk_cpu_freq_set( RTC_CPU_FREQ_240M );
     setCpuFrequencyMhz( 240 );
 }
 
@@ -101,7 +134,8 @@ void bma_loop( TTGOClass *ttgo ) {
     }
 
     if ( !powermgm_get_event( POWERMGM_STANDBY ) && xEventGroupGetBitsFromISR( bma_event_handle ) & BMA_EVENT_INT ) {
-        statusbar_update_stepcounter( ttgo->bma->getCounter() );
+        stepcounter_before_reset = ttgo->bma->getCounter();
+        statusbar_update_stepcounter( stepcounter + ttgo->bma->getCounter() );
         xEventGroupClearBitsFromISR( bma_event_handle, BMA_EVENT_INT );
     }
 }

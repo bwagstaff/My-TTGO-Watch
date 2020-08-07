@@ -132,17 +132,19 @@ void weather_app_setup( void ) {
 
 static void enter_weather_widget_event_cb( lv_obj_t * obj, lv_event_t event ) {
     switch( event ) {
-        case( LV_EVENT_CLICKED ):       motor_vibe( 1 );
+        case( LV_EVENT_CLICKED ):       statusbar_hide( true );
                                         mainbar_jump_to_tilenumber( weather_app_tile_num, LV_ANIM_OFF );
                                         break;
     }    
 }
 
 void weather_jump_to_forecast( void ) {
+    statusbar_hide( true );
     mainbar_jump_to_tilenumber( weather_app_tile_num, LV_ANIM_ON );
 }
 
 void weather_jump_to_setup( void ) {
+    statusbar_hide( true );
     mainbar_jump_to_tilenumber( weather_app_setup_tile_num, LV_ANIM_ON );    
 }
 
@@ -168,6 +170,8 @@ weather_config_t *weather_get_config( void ) {
 
 void weather_widget_sync_Task( void * pvParameters ) {
     log_i("start weather widget task");
+
+    vTaskDelay( 250 );
 
     if ( xEventGroupGetBits( weather_widget_event_handle ) & WEATHER_WIDGET_SYNC_REQUEST ) {       
         uint32_t retval = weather_fetch_today( &weather_config, &weather_today );
@@ -229,50 +233,13 @@ void weather_load_config( void ) {
         log_e( "Can't open file: %s\r\n", WEATHER_CONFIG_FILE );
     }
     else {
-        size_t filesize = file.size();
-
-        // Special case, convert V1 of the file to a versioned V2 format
-        if (filesize == sizeof(weather_config_t_v1))
-        {
-            log_i("Reading weather config v1");
-            weather_config_t_v1 v1Config;
-            weather_config_t_v2 &v2Config = weather_config; // For now, V2 is current.
-            file.read((uint8_t *)&v1Config, filesize);
-            log_i("Converting weather config v1 to v2");
-            v2Config.version = 2;
-            memcpy(&v2Config.apikey[0], &v1Config, sizeof(weather_config_t_v1));
-            v2Config.autosync = v1Config.autosync;
-            v2Config.showWind = false;
+        int filesize = file.size();
+        if ( filesize > sizeof( weather_config ) ) {
+            log_e("Failed to read configfile. Wrong filesize!" );
         }
-        else if ( filesize > 0)
-        {
-            // Read version number, then verify and catch up as needed
-            uint8_t version = 0;
-            file.read(&version, 1);
-            file.seek(0, fs::SeekSet);
-            log_v("Reading weather config version: %d", version);
-
-            if ( version > currentConfigVersion)
-            {
-                log_e( "Unexpected weather config version. Expected at most %d found %d", currentConfigVersion, version);
-            }
-            if ( version == 2 )
-            {
-                if (filesize != sizeof(weather_config_t_v2))
-                {
-                    log_e( "Failed to read weather config file. Wrong filesize! Expected %d found %d", sizeof(weather_config_t_v2), filesize);
-                }
-                else
-                {
-                    file.read((uint8_t *)&weather_config, filesize);
-                }
-            }
+        else {
+            file.read( (uint8_t *)&weather_config, filesize );
         }
-        else
-        {
-            log_e( "Failed to read weather config file. File size is %d", filesize);
-        }
-
         file.close();
     }
 }

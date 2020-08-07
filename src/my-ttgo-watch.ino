@@ -35,6 +35,7 @@
 
 #include "app/games/ttt/ttt_icon.h"
 #include "app/weather/weather.h"
+#include "app/example_app/example_app.h"
 
 
 TTGOClass *ttgo = TTGOClass::getWatch();
@@ -77,6 +78,7 @@ void setup()
      */
     weather_app_setup();
     tic_tac_toe_game_setup();
+    example_app_setup();
     /*
      *
      */

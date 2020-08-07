@@ -86,6 +86,7 @@ void time_settings_tile_setup( void ) {
     lv_obj_add_style( wifisync_cont, LV_OBJ_PART_MAIN, &time_settings_style  );
     lv_obj_align( wifisync_cont, time_settings_tile, LV_ALIGN_IN_TOP_RIGHT, 0, 75 );
     wifisync_onoff = lv_switch_create( wifisync_cont, NULL );
+    lv_obj_add_protect( wifisync_onoff, LV_PROTECT_CLICK_FOCUS);
     lv_obj_add_style( wifisync_onoff, LV_SWITCH_PART_INDIC, mainbar_get_switch_style() );
     lv_switch_off( wifisync_onoff, LV_ANIM_ON );
     lv_obj_align( wifisync_onoff, wifisync_cont, LV_ALIGN_IN_RIGHT_MID, -5, 0 );
@@ -100,6 +101,7 @@ void time_settings_tile_setup( void ) {
     lv_obj_add_style( daylight_cont, LV_OBJ_PART_MAIN, &time_settings_style  );
     lv_obj_align( daylight_cont, wifisync_cont, LV_ALIGN_OUT_BOTTOM_MID, 0, 0 );
     daylight_onoff = lv_switch_create( daylight_cont, NULL );
+    lv_obj_add_protect( daylight_onoff, LV_PROTECT_CLICK_FOCUS);
     lv_obj_add_style( daylight_onoff, LV_SWITCH_PART_INDIC, mainbar_get_switch_style() );
     lv_switch_off( daylight_onoff, LV_ANIM_ON );
     lv_obj_align( daylight_onoff, daylight_cont, LV_ALIGN_IN_RIGHT_MID, -5, 0 );
@@ -138,48 +140,32 @@ void time_settings_tile_setup( void ) {
 
 static void enter_time_setup_event_cb( lv_obj_t * obj, lv_event_t event ) {
     switch( event ) {
-        case( LV_EVENT_CLICKED ):       motor_vibe( 1 );
-                                        mainbar_jump_to_tilenumber( time_tile_num, LV_ANIM_OFF );
+        case( LV_EVENT_CLICKED ):       mainbar_jump_to_tilenumber( time_tile_num, LV_ANIM_OFF );
                                         break;
     }
 }
 
 static void exit_time_setup_event_cb( lv_obj_t * obj, lv_event_t event ) {
     switch( event ) {
-        case( LV_EVENT_CLICKED ):       motor_vibe( 1 );
-                                        mainbar_jump_to_tilenumber( setup_get_tile_num(), LV_ANIM_OFF );
+        case( LV_EVENT_CLICKED ):       mainbar_jump_to_tilenumber( setup_get_tile_num(), LV_ANIM_OFF );
                                         break;
     }
 }
 
 static void wifisync_onoff_event_handler(lv_obj_t * obj, lv_event_t event) {
-    if(event == LV_EVENT_VALUE_CHANGED) {
-        motor_vibe( 1 );
-        if( lv_switch_get_state( obj ) ) {
-            timesync_set_timesync( true );
-        }
-        else {
-            timesync_set_timesync( false );
-        }
+    switch( event ) {
+        case ( LV_EVENT_VALUE_CHANGED):     timesync_set_timesync( lv_switch_get_state( obj ) );
     }
 }
 
 static void daylight_onoff_event_handler(lv_obj_t * obj, lv_event_t event) {
-    if(event == LV_EVENT_VALUE_CHANGED) {
-        motor_vibe( 1 );
-        if( lv_switch_get_state( obj ) ) {
-            timesync_set_daylightsave( true );
-        }
-        else {
-            timesync_set_daylightsave( false );
-        }
+    switch( event ) {
+        case ( LV_EVENT_VALUE_CHANGED):     timesync_set_daylightsave( lv_switch_get_state( obj ) );
     }
 }
 
-static void utczone_event_handler(lv_obj_t * obj, lv_event_t event)
-{
-    if(event == LV_EVENT_VALUE_CHANGED) {
-            motor_vibe( 1 );
-            timesync_set_timezone( lv_dropdown_get_selected( obj ) - 12 );
+static void utczone_event_handler(lv_obj_t * obj, lv_event_t event) {
+    switch( event ) {
+        case ( LV_EVENT_VALUE_CHANGED):     timesync_set_timezone( lv_dropdown_get_selected( obj ) - 12 );
     }
 }
