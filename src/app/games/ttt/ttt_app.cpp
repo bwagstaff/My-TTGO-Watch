@@ -352,7 +352,7 @@ void TicTacToeApp::ClearBoard()
     {
         lv_obj_reset_style_list(button, LV_BTN_PART_MAIN);
         lv_obj_add_style(button, LV_BTN_PART_MAIN, &mStyleBlank);
-        lv_btn_set_state(button, LV_BTN_STATE_RELEASED);
+        lv_btn_set_state(button, LV_BTN_STATE_ACTIVE);
     }
     mCurrentPlayer = Red;
 }
@@ -363,6 +363,7 @@ void TicTacToeApp::OnMenuClicked(MenuItem item)
     {
     case Reset:
         ClearBoard();
+        lv_tileview_set_tile_act(GetTileView(), 1, 0, LV_ANIM_ON);
         break;
     case Exit:
         OnExitClicked();
