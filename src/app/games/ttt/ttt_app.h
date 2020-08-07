@@ -56,8 +56,17 @@ private:
 
     void NextPlayer() { mCurrentPlayer = (mCurrentPlayer == Red) ? Blue : Red; };
 
+    void OnExitClicked();
+
 public:
-    TicTacToeApp(TicTacToeIcon* callingIcon);
+    enum MenuItem : uint8_t
+    {
+        Reset,
+        Exit,
+        NumMenuItems
+    };
+
+    TicTacToeApp(TicTacToeIcon *callingIcon);
     ~TicTacToeApp();
 
     void ClearBoard();
@@ -65,9 +74,9 @@ public:
     // Launch from watch mainbar
     void OnLaunch();
 
-    // Menu Callbacks
-    void OnExitClicked();
-
     // TTT square pressed
-    void TileClicked(int index);
+    void OnTileClicked(int index);
+
+    // A menu item was clicked.
+    void OnMenuClicked(MenuItem item);
 };

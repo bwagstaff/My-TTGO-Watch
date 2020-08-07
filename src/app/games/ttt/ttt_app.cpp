@@ -36,8 +36,7 @@
 #include "ttt_app.h"
 #include "ttt_icon.h"
 
-//TODO: Placeholder exit icon, screen backgrounds
-LV_IMG_DECLARE(exit_32px);
+//TODO: Placeholder background images
 LV_IMG_DECLARE(bg1);
 LV_IMG_DECLARE(bg2);
 
@@ -49,7 +48,7 @@ static void OnSquareUL(struct _lv_obj_t *obj, lv_event_t event)
     switch (event)
     {
     case (LV_EVENT_CLICKED):
-        gameInstance->TileClicked(0);
+        gameInstance->OnTileClicked(0);
         break;
     }
 }
@@ -58,7 +57,7 @@ static void OnSquareUC(struct _lv_obj_t *obj, lv_event_t event)
     switch (event)
     {
     case (LV_EVENT_CLICKED):
-        gameInstance->TileClicked(1);
+        gameInstance->OnTileClicked(1);
         break;
     }
 }
@@ -67,7 +66,7 @@ static void OnSquareUR(struct _lv_obj_t *obj, lv_event_t event)
     switch (event)
     {
     case (LV_EVENT_CLICKED):
-        gameInstance->TileClicked(2);
+        gameInstance->OnTileClicked(2);
         break;
     }
 }
@@ -76,7 +75,7 @@ static void OnSquareCL(struct _lv_obj_t *obj, lv_event_t event)
     switch (event)
     {
     case (LV_EVENT_CLICKED):
-        gameInstance->TileClicked(3);
+        gameInstance->OnTileClicked(3);
         break;
     }
 }
@@ -85,7 +84,7 @@ static void OnSquareCC(struct _lv_obj_t *obj, lv_event_t event)
     switch (event)
     {
     case (LV_EVENT_CLICKED):
-        gameInstance->TileClicked(4);
+        gameInstance->OnTileClicked(4);
         break;
     }
 }
@@ -94,7 +93,7 @@ static void OnSquareCR(struct _lv_obj_t *obj, lv_event_t event)
     switch (event)
     {
     case (LV_EVENT_CLICKED):
-        gameInstance->TileClicked(5);
+        gameInstance->OnTileClicked(5);
         break;
     }
 }
@@ -103,7 +102,7 @@ static void OnSquareBL(struct _lv_obj_t *obj, lv_event_t event)
     switch (event)
     {
     case (LV_EVENT_CLICKED):
-        gameInstance->TileClicked(6);
+        gameInstance->OnTileClicked(6);
         break;
     }
 }
@@ -112,7 +111,7 @@ static void OnSquareBC(struct _lv_obj_t *obj, lv_event_t event)
     switch (event)
     {
     case (LV_EVENT_CLICKED):
-        gameInstance->TileClicked(7);
+        gameInstance->OnTileClicked(7);
         break;
     }
 }
@@ -121,7 +120,7 @@ static void OnSquareBR(struct _lv_obj_t *obj, lv_event_t event)
     switch (event)
     {
     case (LV_EVENT_CLICKED):
-        gameInstance->TileClicked(8);
+        gameInstance->OnTileClicked(8);
         break;
     }
 }
@@ -131,18 +130,28 @@ static void OnExit(struct _lv_obj_t *obj, lv_event_t event)
     switch (event)
     {
     case (LV_EVENT_CLICKED):
-        gameInstance->OnExitClicked();
+        gameInstance->OnMenuClicked(TicTacToeApp::Exit);
         break;
     }
 }
 
-TicTacToeApp::TicTacToeApp(TicTacToeIcon* icon)
+static void OnReset(struct _lv_obj_t *obj, lv_event_t event)
+{
+    switch (event)
+    {
+    case (LV_EVENT_CLICKED):
+        gameInstance->OnMenuClicked(TicTacToeApp::Reset);
+        break;
+    }
+}
+
+TicTacToeApp::TicTacToeApp(TicTacToeIcon *icon)
 {
     gameInstance = this;
     mParentIcon = icon;
 
     log_d("Creating game tiles...");
-    if(!AllocateAppTiles(2,1))
+    if (!AllocateAppTiles(2, 1))
     {
         log_e("Could not allocate tiles. Aborting.");
         return;
@@ -184,6 +193,10 @@ TicTacToeApp::TicTacToeApp(TicTacToeIcon* icon)
         lv_style_init(&mStyleMenu);
         lv_style_copy(&mStyleMenu, &mStyleApp);
         lv_style_set_text_color(&mStyleMenu, LV_LABEL_PART_MAIN, LV_COLOR_WHITE);
+        lv_style_set_bg_opa(&mStyleMenu, LV_STATE_DEFAULT, LV_OPA_COVER);
+        lv_style_set_bg_color(&mStyleMenu, LV_STATE_DEFAULT, LV_COLOR_BLUE);
+        lv_style_set_bg_grad_color(&mStyleMenu, LV_STATE_DEFAULT, LV_COLOR_NAVY);
+        lv_style_set_bg_grad_dir(&mStyleMenu, LV_STATE_DEFAULT, LV_GRAD_DIR_VER);
         lv_obj_add_style(menuTile, LV_LABEL_PART_MAIN, &mStyleMenu);
 
         log_d("Creating button styles");
@@ -217,20 +230,40 @@ TicTacToeApp::TicTacToeApp(TicTacToeIcon* icon)
 
     log_d("Initializing menu");
     {
-        // Have our app display an exit button on the main page.
-        //TODO: Replace with a proper menu
-        lv_obj_t *exit_btn = lv_imgbtn_create(menuTile, NULL);
-        lv_imgbtn_set_src(exit_btn, LV_BTN_STATE_RELEASED, &exit_32px);
-        lv_imgbtn_set_src(exit_btn, LV_BTN_STATE_PRESSED, &exit_32px);
-        lv_imgbtn_set_src(exit_btn, LV_BTN_STATE_CHECKED_RELEASED, &exit_32px);
-        lv_imgbtn_set_src(exit_btn, LV_BTN_STATE_CHECKED_PRESSED, &exit_32px);
-        lv_obj_add_style(exit_btn, LV_IMGBTN_PART_MAIN, &mStyleMenu);
-        lv_obj_align(exit_btn, menuTile, LV_ALIGN_IN_TOP_LEFT, 10, 10);
-        lv_obj_set_event_cb(exit_btn, OnExit);
+        lv_obj_t *button;
+        lv_obj_t *label;
 
-        lv_obj_t *menuText = lv_label_create(menuTile, NULL);
-        lv_label_set_text(menuText, "Swipe left for the play area.\nMenu coming eventually.");
-        lv_obj_set_pos(menuText, 13, 40);
+        int offset = 64; // starting offset down the screen
+        constexpr int buttonSpacing = 32;
+        constexpr int buttonWidth = 120;
+        constexpr int buttonHeight = 24;
+
+        label = lv_label_create(menuTile, NULL);
+        lv_label_set_text_static(label, "Tic Tac Toe");
+        lv_obj_align(label, menuTile, LV_ALIGN_IN_TOP_MID, 0, 10);
+        lv_label_set_align(label, LV_LABEL_ALIGN_CENTER);
+
+        button = lv_btn_create(menuTile, NULL);
+        label = lv_label_create(button, NULL);
+        lv_label_set_text(label, "New Game");
+        lv_obj_set_event_cb(button, OnReset);
+        lv_obj_align(button, menuTile, LV_ALIGN_IN_TOP_MID, 0, offset);
+        lv_obj_set_size(button, buttonWidth, buttonHeight);
+        offset += buttonSpacing;
+
+        button = lv_btn_create(menuTile, NULL);
+        label = lv_label_create(button, NULL);
+        lv_label_set_text(label, "Exit");
+        lv_obj_set_event_cb(button, OnExit);
+        lv_obj_align(button, menuTile, LV_ALIGN_IN_TOP_MID, 0, offset);
+        lv_obj_set_size(button, buttonWidth, buttonHeight);
+        offset += buttonSpacing;
+
+        label = lv_label_create(menuTile, NULL);
+        lv_label_set_text_static(label, "Swipe left for the play area.");
+        lv_obj_align(label, menuTile, LV_ALIGN_IN_TOP_MID, 0, offset);
+        lv_label_set_align(label, LV_LABEL_ALIGN_CENTER);
+        offset += buttonSpacing;
     }
 
     log_d("Initializing game board");
@@ -284,7 +317,7 @@ void TicTacToeApp::OnExitClicked()
     FreeAppTiles();
 }
 
-void TicTacToeApp::TileClicked(int index)
+void TicTacToeApp::OnTileClicked(int index)
 {
     if (index < 0 || index >= NUM_SQUARES)
     {
@@ -312,5 +345,29 @@ void TicTacToeApp::TileClicked(int index)
 void TicTacToeApp::ClearBoard()
 {
     for (Owner &c : mBoard)
+    {
         c = Owner::None;
+    }
+    for (lv_obj_t *button : mButtons)
+    {
+        lv_obj_reset_style_list(button, LV_BTN_PART_MAIN);
+        lv_obj_add_style(button, LV_BTN_PART_MAIN, &mStyleBlank);
+        lv_btn_set_state(button, LV_BTN_STATE_RELEASED);
+    }
+    mCurrentPlayer = Red;
+}
+
+void TicTacToeApp::OnMenuClicked(MenuItem item)
+{
+    switch (item)
+    {
+    case Reset:
+        ClearBoard();
+        break;
+    case Exit:
+        OnExitClicked();
+        break;
+    default:
+        log_e("Unknown menu command %d", item);
+    }
 }

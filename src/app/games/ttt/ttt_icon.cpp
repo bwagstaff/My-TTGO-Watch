@@ -34,7 +34,7 @@
 #include "ttt_app.h"
 
 // Use this icon image
-LV_IMG_DECLARE(move_64px);
+LV_IMG_DECLARE(ttt_64px);
 
 // The one and only.
 static TicTacToeIcon iconInstance;
@@ -57,7 +57,7 @@ static void startGame(struct _lv_obj_t *obj, lv_event_t event)
 TicTacToeIcon::TicTacToeIcon()
 {
     pAppname = "Tic Tac Toe";
-    pMenuIcon = &move_64px;
+    pMenuIcon = &ttt_64px;
     pStartFunction = startGame;
 }
 
