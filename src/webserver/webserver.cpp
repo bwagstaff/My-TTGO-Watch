@@ -81,7 +81,7 @@ void asyncwebserver_setup(void){
 
   asyncserver.on("/info", HTTP_GET, [](AsyncWebServerRequest *request) {
     String message("Firmwarestand: " __DATE__ " " __TIME__ "\nGCC-Version: " __VERSION__ "\n");
-    message = message + "Heap: " + ESP.getFreeHeap() + " bytes used of " + ESP.getHeapSize() + " bytes total\nHeap low water mark: " + ESP.getMinFreeHeap() + " bytes available\nPsram: " + ESP.getFreePsram() + " bytes used of " + ESP.getPsramSize() + " bytes available\nCurrent battery voltage: " + TTGOClass::getWatch()->power->getBattVoltage() / 1000 + " Volts";
+    message = message + "Heap: " + ESP.getFreeHeap() + " bytes free of " + ESP.getHeapSize() + " bytes total\nHeap low water mark: " + ESP.getMinFreeHeap() + " bytes available\nPsram: " + ESP.getFreePsram() + " bytes free of " + ESP.getPsramSize() + " bytes available\nCurrent battery voltage: " + TTGOClass::getWatch()->power->getBattVoltage() / 1000 + " Volts";
     request->send(200, "text/plain", message.c_str());
   });
 
