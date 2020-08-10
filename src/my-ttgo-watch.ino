@@ -34,6 +34,7 @@
 #include "hardware/wifictl.h"
 
 #include "app/games/ttt/ttt_icon.h"
+#include "app/games/simonsays/simonsays_icon.h"
 #include "app/weather/weather.h"
 #include "app/example_app/example_app.h"
 
@@ -78,6 +79,7 @@ void setup()
      */
     weather_app_setup();
     tic_tac_toe_game_setup();
+    simonsays_game_setup();
     example_app_setup();
     /*
      *
