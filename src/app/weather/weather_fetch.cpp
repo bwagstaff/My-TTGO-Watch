@@ -20,7 +20,6 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 #include "config.h"
-#include "ArduinoJson.h"
 #include "HTTPClient.h"
 
 #include "weather.h"
@@ -28,14 +27,7 @@
 #include "weather_forecast.h"
 
 #include "hardware/powermgm.h"
-
-// arduinoJson allocator for external PSRAM
-// see: https://arduinojson.org/v6/how-to/use-external-ram-on-esp32/
-struct SpiRamAllocator {
-  void* allocate( size_t size ) { return ps_calloc( size, 1 ); }
-  void deallocate( void* pointer ) { free( pointer ); }
-};
-using SpiRamJsonDocument = BasicJsonDocument<SpiRamAllocator>;
+#include "hardware/json_psram_allocator.h"
 
 /* Utility function to convert numbers to directions */
 static void weather_wind_to_string( weather_forcast_t* container, int speed, int directionDegree);

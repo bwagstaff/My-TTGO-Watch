@@ -24,9 +24,10 @@
 
     #include <TTGO.h>
 
-    #define TIME_SYNC_REQUEST    _BV(0)
+    #define TIME_SYNC_REQUEST       _BV(0)
 
-    #define TIMESYNC_CONFIG_FILE  "/timesync.cfg"
+    #define TIMESYNC_CONFIG_FILE        "/timesync.cfg"
+    #define TIMESYNC_JSON_CONFIG_FILE   "/timesync.json"
 
     typedef struct {
         bool timesync = true;
@@ -84,8 +85,13 @@
      * @param timezone timezone from UTC-12 to UTC+12
      */
     void timesync_set_timezone( int32_t timezone );
-
+    /*
+     * @brief wrapper function to sync the system with rtc
+     */
     void timesyncToSystem( void );
+    /*
+     * @brief wrapper function to sync the rtc with system
+     */
     void timesyncToRTC( void );
 
 #endif // _TIME_SYNC_H

@@ -36,6 +36,7 @@
 
 #include "hardware/powermgm.h"
 #include "hardware/wifictl.h"
+#include "hardware/blectl.h"
 
 static lv_obj_t *statusbar = NULL;
 static lv_obj_t *statusbar_wifi = NULL;
@@ -48,6 +49,7 @@ lv_status_bar_t statusicon[ STATUSBAR_NUM ] =
 {
     { NULL, NULL, LV_ALIGN_IN_TOP_RIGHT, &statusbarstyle[ STATUSBAR_STYLE_WHITE ] },
     { NULL, LV_SYMBOL_BATTERY_FULL, LV_ALIGN_OUT_LEFT_MID, &statusbarstyle[ STATUSBAR_STYLE_WHITE ] },
+    { NULL, LV_SYMBOL_BLUETOOTH, LV_ALIGN_OUT_LEFT_MID, &statusbarstyle[ STATUSBAR_STYLE_WHITE ] },
     { NULL, LV_SYMBOL_WIFI, LV_ALIGN_OUT_LEFT_MID, &statusbarstyle[ STATUSBAR_STYLE_WHITE ] },
     { NULL, LV_SYMBOL_BELL, LV_ALIGN_OUT_LEFT_MID, &statusbarstyle[ STATUSBAR_STYLE_WHITE ] },
     { NULL, LV_SYMBOL_WARNING, LV_ALIGN_OUT_LEFT_MID, &statusbarstyle[ STATUSBAR_STYLE_WHITE ] },
@@ -56,6 +58,9 @@ lv_status_bar_t statusicon[ STATUSBAR_NUM ] =
 void statusbar_event( lv_obj_t * statusbar, lv_event_t event );
 void statusbar_wifi_event_cb( lv_obj_t *wifi, lv_event_t event );
 void statusbar_bluetooth_event_cb( lv_obj_t *wifi, lv_event_t event );
+void statusbar_blectl_event_cb( EventBits_t event, char* msg );
+void statusbar_wifictl_event_cb( EventBits_t event, char* msg );
+
 
 LV_IMG_DECLARE(wifi_64px);
 LV_IMG_DECLARE(bluetooth_64px);
@@ -178,8 +183,56 @@ void statusbar_setup( void )
     statusbar_hide_icon( STATUSBAR_BELL );
     statusbar_hide_icon( STATUSBAR_WARNING );
     statusbar_hide_icon( STATUSBAR_WIFI );
+    statusbar_style_icon( STATUSBAR_BLUETOOTH, STATUSBAR_STYLE_GRAY );
+
+    blectl_register_cb( BLECTL_CONNECT | BLECTL_DISCONNECT | BLECTL_PIN_AUTH , statusbar_blectl_event_cb );
+    wifictl_register_cb( WIFICTL_CONNECT | WIFICTL_DISCONNECT | WIFICTL_OFF | WIFICTL_ON | WIFICTL_SCAN | WIFICTL_WPS_SUCCESS | WIFICTL_WPS_FAILED, statusbar_wifictl_event_cb );
 }
 
+void statusbar_blectl_event_cb( EventBits_t event, char* msg ) {
+    log_i("blectl event msg: %s", msg );
+    switch( event ) {
+        case BLECTL_CONNECT:        statusbar_style_icon( STATUSBAR_BLUETOOTH, STATUSBAR_STYLE_WHITE );
+                                    break;
+        case BLECTL_DISCONNECT:     statusbar_style_icon( STATUSBAR_BLUETOOTH, STATUSBAR_STYLE_GRAY );
+                                    break;
+    }
+}
+
+void statusbar_wifictl_event_cb( EventBits_t event, char* msg ) {
+    log_i("wifictl event msg: %s", msg );
+    switch( event ) {
+        case WIFICTL_CONNECT:       statusbar_style_icon( STATUSBAR_WIFI, STATUSBAR_STYLE_WHITE );
+                                    statusbar_wifi_set_state( true, msg );
+                                    statusbar_show_icon( STATUSBAR_WIFI );
+                                    break;
+        case WIFICTL_DISCONNECT:    statusbar_style_icon( STATUSBAR_WIFI, STATUSBAR_STYLE_GRAY );
+                                    statusbar_wifi_set_state( true, msg );
+                                    statusbar_show_icon( STATUSBAR_WIFI );
+                                    break;
+        case WIFICTL_OFF:           statusbar_style_icon( STATUSBAR_WIFI, STATUSBAR_STYLE_GRAY );
+                                    statusbar_hide_icon( STATUSBAR_WIFI );
+                                    statusbar_wifi_set_state( false, "" );
+                                    break;
+        case WIFICTL_ON:            statusbar_style_icon( STATUSBAR_WIFI, STATUSBAR_STYLE_GRAY );
+                                    statusbar_wifi_set_state( true, msg );
+                                    statusbar_show_icon( STATUSBAR_WIFI );
+                                    break;
+        case WIFICTL_WPS_SUCCESS:   statusbar_style_icon( STATUSBAR_WIFI, STATUSBAR_STYLE_GRAY );
+                                    statusbar_wifi_set_state( true, msg );
+                                    statusbar_show_icon( STATUSBAR_WIFI );
+                                    break;
+        case WIFICTL_WPS_FAILED:    statusbar_style_icon( STATUSBAR_WIFI, STATUSBAR_STYLE_GRAY );
+                                    statusbar_wifi_set_state( true, msg );
+                                    statusbar_show_icon( STATUSBAR_WIFI );
+                                    break;
+        case WIFICTL_SCAN:          statusbar_style_icon( STATUSBAR_WIFI, STATUSBAR_STYLE_GRAY );
+                                    statusbar_wifi_set_state( true, msg );
+                                    statusbar_show_icon( STATUSBAR_WIFI );
+                                    break;
+    }
+    statusbar_refresh();
+}
 /*
  *
  */
@@ -187,10 +240,9 @@ void statusbar_wifi_event_cb( lv_obj_t *wifi, lv_event_t event ) {
     if ( event == LV_EVENT_VALUE_CHANGED ) {
         switch ( lv_imgbtn_get_state( wifi ) ) {
             case( LV_BTN_STATE_CHECKED_RELEASED ):  wifictl_off(); 
-                                            break;
-            case( LV_BTN_STATE_RELEASED ):   wifictl_on();
-                                            break;
-            default:                        break;
+                                                    break;
+            case( LV_BTN_STATE_RELEASED ):          wifictl_on();
+                                                    break;
         }
     }
 }
@@ -218,8 +270,8 @@ void statusbar_wifi_set_state( bool state, const char *wifiname ) {
     else {
         lv_imgbtn_set_state( statusbar_wifi, LV_BTN_STATE_CHECKED_RELEASED );
     }
-    lv_label_set_long_mode( statusbar_wifilabel, LV_LABEL_LONG_SROLL_CIRC);
-    lv_obj_set_width( statusbar_wifilabel, LV_HOR_RES);
+//    lv_label_set_long_mode( statusbar_wifilabel, LV_LABEL_LONG_SROLL_CIRC);
+//    lv_obj_set_width( statusbar_wifilabel, LV_HOR_RES);
     lv_label_set_text( statusbar_wifilabel, wifiname);
     lv_obj_align( statusbar_wifilabel, statusbar_wifi, LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
     statusbar_refresh();
@@ -280,7 +332,6 @@ void statusbar_refresh( void ) {
             }
             lv_obj_reset_style_list( statusicon[ i ].icon, LV_OBJ_PART_MAIN );
             lv_obj_add_style( statusicon[ i ].icon, LV_OBJ_PART_MAIN, statusicon[i].style );
-//            lv_obj_set_style( statusicon[ i ].icon, statusicon[i].style );
         }
     }
 }

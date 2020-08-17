@@ -21,7 +21,6 @@
  */
 #include "config.h"
 #include <Arduino.h>
-#include <WiFi.h>
 #include <HTTPClient.h>
 #include <HTTPUpdate.h>
 
@@ -33,6 +32,8 @@
 #include "gui/mainbar/setup_tile/setup.h"
 #include "gui/statusbar.h"
 #include "hardware/display.h"
+#include "hardware/powermgm.h"
+#include "hardware/wifictl.h"
 
 EventGroupHandle_t update_event_handle = NULL;
 TaskHandle_t _update_Task;
@@ -57,6 +58,8 @@ LV_IMG_DECLARE(setup_32px);
 LV_IMG_DECLARE(update_64px);
 LV_IMG_DECLARE(info_1_16px);
 
+void update_wifictl_event_cb( EventBits_t event, char* msg );
+
 void update_tile_setup( void ) {
     // get an app tile and copy mainstyle
     update_tile_num = mainbar_add_app_tile( 1, 2 );
@@ -73,6 +76,7 @@ void update_tile_setup( void ) {
     // register an setup icon an set an callback
     update_setup_icon_cont = setup_tile_register_setup();
     lv_obj_t *update_setup = lv_imgbtn_create ( update_setup_icon_cont, NULL);
+    mainbar_add_slide_element(update_setup);
     lv_imgbtn_set_src( update_setup, LV_BTN_STATE_RELEASED, &update_64px);
     lv_imgbtn_set_src( update_setup, LV_BTN_STATE_PRESSED, &update_64px);
     lv_imgbtn_set_src( update_setup, LV_BTN_STATE_CHECKED_RELEASED, &update_64px);
@@ -133,15 +137,16 @@ void update_tile_setup( void ) {
     lv_label_set_text( update_status_label, "" );
     lv_obj_align( update_status_label, update_btn, LV_ALIGN_OUT_BOTTOM_MID, 0, 5 );
 
-    // regster callback
-    WiFi.onEvent( [](WiFiEvent_t event, WiFiEventInfo_t info) {
-        if ( update_setup_get_autosync() ) {
-            update_check_version();
-        }
-    }, WiFiEvent_t::SYSTEM_EVENT_STA_GOT_IP );
+    wifictl_register_cb( WIFICTL_CONNECT, update_wifictl_event_cb );
 
     update_event_handle = xEventGroupCreate();
     xEventGroupClearBits( update_event_handle, UPDATE_REQUEST );
+}
+
+void update_wifictl_event_cb( EventBits_t event, char* msg ) {
+    if ( update_setup_get_autosync() ) {
+        update_check_version();
+    }
 }
 
 static void enter_update_setup_setup_event_cb( lv_obj_t * obj, lv_event_t event ) {
@@ -224,7 +229,9 @@ void update_Task( void * pvParameters ) {
             WiFiClient client;
 
             lv_label_set_text( update_status_label, "start update ..." );
-            lv_obj_align( update_status_label, update_btn, LV_ALIGN_OUT_BOTTOM_MID, 0, 15 );  
+            lv_obj_align( update_status_label, update_btn, LV_ALIGN_OUT_BOTTOM_MID, 0, 15 );
+
+            httpUpdate.rebootOnUpdate( false );
 
             t_httpUpdate_return ret = httpUpdate.update( client, "http://www.neo-guerillaz.de/ttgo-t-watch2020_v1.ino.bin" );
 
@@ -240,7 +247,7 @@ void update_Task( void * pvParameters ) {
                     break;
 
                 case HTTP_UPDATE_OK:
-                    lv_label_set_text( update_status_label, "update ok" );
+                    lv_label_set_text( update_status_label, "update ok, turn off and on!" );
                     lv_obj_align( update_status_label, update_btn, LV_ALIGN_OUT_BOTTOM_MID, 0, 15 );  
                     break;
             }

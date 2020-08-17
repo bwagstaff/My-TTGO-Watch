@@ -42,9 +42,10 @@ lv_widget_entry_t widget_entry[ MAX_WIDGET_NUM ];
 LV_FONT_DECLARE(Ubuntu_72px);
 LV_FONT_DECLARE(Ubuntu_16px);
 
-lv_task_t * task;
-void main_tile_task( lv_task_t * task );
-void main_tile_aling_widgets( void );
+lv_task_t * main_tile_task;
+
+void main_tile_update_task( lv_task_t * task );
+void main_tile_align_widgets( void );
 
 void main_tile_setup( void ) {
     main_tile_num = mainbar_add_tile( 0, 0 );
@@ -57,7 +58,7 @@ void main_tile_setup( void ) {
     lv_style_copy( &datestyle, style);
     lv_style_set_text_font( &datestyle, LV_STATE_DEFAULT, &Ubuntu_16px);
 
-    clock_cont = lv_obj_create( main_cont, NULL );
+    clock_cont = mainbar_obj_create( main_cont );
     lv_obj_set_size( clock_cont, LV_HOR_RES , LV_VER_RES / 2 );
     lv_obj_add_style( clock_cont, LV_OBJ_PART_MAIN, style );
     lv_obj_align( clock_cont, main_cont, LV_ALIGN_CENTER, 0, 0 );
@@ -88,7 +89,7 @@ void main_tile_setup( void ) {
     lv_obj_align( datelabel, timelabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 0 );
 
     for ( int widget = 0 ; widget < MAX_WIDGET_NUM ; widget++ ) {
-        widget_entry[ widget ].widget = lv_obj_create( main_cont, NULL );
+        widget_entry[ widget ].widget = mainbar_obj_create( main_cont );
         widget_entry[ widget ].active = false;
         lv_obj_reset_style_list( widget_entry[ widget ].widget, LV_OBJ_PART_MAIN );
         lv_obj_add_style( widget_entry[ widget ].widget, LV_OBJ_PART_MAIN, style );
@@ -96,7 +97,7 @@ void main_tile_setup( void ) {
         lv_obj_set_hidden( widget_entry[ widget ].widget, true );
     }
 
-    task = lv_task_create( main_tile_task, 1000, LV_TASK_PRIO_MID, NULL );
+    main_tile_task = lv_task_create( main_tile_update_task, 500, LV_TASK_PRIO_MID, NULL );
 }
 
 lv_obj_t *main_tile_register_widget( void ) {
@@ -104,7 +105,7 @@ lv_obj_t *main_tile_register_widget( void ) {
         if ( widget_entry[ widget ].active == false ) {
             widget_entry[ widget ].active = true;
             lv_obj_set_hidden( widget_entry[ widget ].widget, false );
-            main_tile_aling_widgets();
+            main_tile_align_widgets();
             return( widget_entry[ widget ].widget );
         }
     }
@@ -112,7 +113,7 @@ lv_obj_t *main_tile_register_widget( void ) {
     return( NULL );
 }
 
-void main_tile_aling_widgets( void ) {
+void main_tile_align_widgets( void ) {
     int active_widgets = 0;
     lv_coord_t xpos = 0;
 
@@ -137,20 +138,35 @@ uint32_t main_tile_get_tile_num( void ) {
     return( main_tile_num );
 }
 
-
-void main_tile_task( lv_task_t * task ) {
+void main_tile_update_task( lv_task_t * task ) {
     time_t now;
     struct tm  info;
-    char buf[64];
+    char time_str[64]="";
+    static char *old_time_str = NULL;
+
+    // on first run, alloc psram
+    if ( old_time_str == NULL ) {
+        old_time_str = (char *)ps_calloc( sizeof( time_str), 1 );
+        if ( old_time_str == NULL ) {
+            log_e("old_time_str allocation failed");
+            while(true);
+        }
+    }
 
     time( &now );
     localtime_r( &now, &info );
 
-    strftime( buf, sizeof(buf), "%H:%M", &info );
-    lv_label_set_text( timelabel, buf );
-    lv_obj_align( timelabel, clock_cont, LV_ALIGN_CENTER, 0, 0 );
+    strftime( time_str, sizeof(time_str), "%H:%M", &info );
 
-    strftime( buf, sizeof(buf), "%a %d.%b %Y", &info );
-    lv_label_set_text( datelabel, buf );
-    lv_obj_align( datelabel, clock_cont, LV_ALIGN_IN_BOTTOM_MID, 0, 0 );
+    // only update while time_str changes
+    if ( strcmp( time_str, old_time_str ) ) {
+        log_i("renew time_str: %s != %s", time_str, old_time_str );
+        lv_label_set_text( timelabel, time_str );
+        lv_obj_align( timelabel, clock_cont, LV_ALIGN_CENTER, 0, 0 );
+        strlcpy( old_time_str, time_str, sizeof( time_str ) );
+
+        strftime( time_str, sizeof(time_str), "%a %d.%b %Y", &info );
+        lv_label_set_text( datelabel, time_str );
+        lv_obj_align( datelabel, clock_cont, LV_ALIGN_IN_BOTTOM_MID, 0, 0 );
+    }
 }
