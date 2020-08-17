@@ -1,5 +1,5 @@
 /****************************************************************************
- *   July 31 07:31:12 2020
+ *   Aug 14 12:37:31 2020
  *   Copyright  2020  Dirk Brosswick
  *   Email: dirk.brosswick@googlemail.com
  ****************************************************************************/
@@ -19,19 +19,11 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
-#ifndef _UPDATE_SETUP_H
-    #define _UPDATE_SETUP_H
+#ifndef _BLUETOOTH_CALL_H
+    #define _BLUETOOTH_CALL_H
 
     #include <TTGO.h>
 
-    #define UPDATE_CONFIG_FILE             "/update.cfg"
-    #define UPDATE_JSON_CONFIG_FILE        "/update.json"
+    void bluetooth_call_tile_setup( void );
 
-    typedef struct {
-        bool autosync = true;
-    } update_config_t;
-
-    void update_setup_tile_setup( uint32_t tile_num );
-    bool update_setup_get_autosync( void );
-
-#endif // _UPDATE_SETUP_H
+#endif // _BLUETOOTH_CALL_H

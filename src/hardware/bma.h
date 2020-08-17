@@ -22,7 +22,10 @@
 #ifndef _BMA_H
     #define _BMA_H
     
-    #define     BMA_EVENT_INT   _BV(0)
+    #define     BMA_EVENT_INT       _BV(0)
+
+    #define BMA_COFIG_FILE          "/bma.cfg"
+    #define BMA_JSON_COFIG_FILE     "/bma.json"
 
     typedef struct {
         bool enable=true;
@@ -34,16 +37,48 @@
         BMA_CONFIG_NUM
     };
 
-    #define BMA_COFIG_FILE  "/bma.cfg"
-
+    /*
+     * @brief setup bma activity measurement
+     * 
+     * @param   ttgo    pointer to an TTGOClass
+     */
     void bma_setup( TTGOClass *ttgo );
+    /*
+     * @brief loop function for activity measurement
+     */
     void bma_loop( TTGOClass *ttgo );
+    /*
+     * @brief put bma into standby, depending on ther config
+     */
     void bma_standby( void );
+    /*
+     * @brief wakeup activity measurement
+     */
     void bma_wakeup( void );
+    /*
+     * @brief reload config
+     */
     void bma_reload_settings( void );
+    /*
+     * @ brief save the config structure to SPIFF
+     */
     void bma_save_config( void );
+    /*
+     * @ brief read the config structure from SPIFF
+     */
     void bma_read_config( void );
+    /*
+     * @brief get config
+     * 
+     * @param   config  configitem
+     */
     bool bma_get_config( int config );
+    /*
+     * @brief set config
+     * 
+     * @param   config  configitem
+     * @param   enable  true or false
+     */
     void bma_set_config( int config, bool enable );
 
 #endif // _BMA_H
