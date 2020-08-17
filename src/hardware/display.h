@@ -32,12 +32,14 @@
     #define DISPLAY_MAX_ROTATE          270
 
     typedef struct {
-        uint32_t brightness = DISPLAY_MIN_BRIGHTNESS;
+        uint32_t brightness = DISPLAY_MAX_BRIGHTNESS;
         uint32_t timeout = DISPLAY_MIN_TIMEOUT;
         uint32_t rotation = 0;
+        bool block_return_maintile = false;
     } display_config_t;
 
-    #define DISPLAY_CONFIG_FILE  "/display.cfg"
+    #define DISPLAY_CONFIG_FILE         "/display.cfg"
+    #define DISPLAY_JSON_CONFIG_FILE    "/display.json"
 
     /*
      * @brief setup display
@@ -96,13 +98,25 @@
      */
     void display_set_rotation( uint32_t rotation );
     /*
+     * @brief read the block_return_maintile while wakeup
+     * 
+     * @param rotation from 0-270 in 90 degree steps
+     */
+    bool display_get_block_return_maintile( void );
+    /*
+     * @brief set the block_return_maintile while wakeup
+     * 
+     * @param block_return_maintile true or false, true means no autoreturn zu maintile
+     */
+    void display_set_block_return_maintile( bool block_return_maintile );
+    /*
      * @brief set display into standby
      */
     void display_standby( void );
     /*
      * @brief set display into normal mode or leave it in standby if a silence wakeup occur
      */
-    void display_wakeup( void );
+    void display_wakeup( bool silence );
 
 
 #endif // _DISPLAY_H

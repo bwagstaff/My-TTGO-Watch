@@ -45,9 +45,10 @@ LV_IMG_DECLARE(exit_32px);
 LV_IMG_DECLARE(setup_32px);
 
 static void enter_battery_settings_event_cb( lv_obj_t * obj, lv_event_t event );
-static void enter_battery_view_event_cb( lv_obj_t * obj, lv_event_t event );
 static void exit_battery_view_event_cb( lv_obj_t * obj, lv_event_t event );
 void battery_view_update_task( lv_task_t *task );
+void battery_activate_cb( void );
+void battery_hibernate_cb( void );
 
 void battery_view_tile_setup( uint32_t tile_num ) {
     // get an app tile and copy mainstyle
@@ -82,7 +83,7 @@ void battery_view_tile_setup( uint32_t tile_num ) {
 
     lv_obj_t *exit_label = lv_label_create( battery_view_tile, NULL);
     lv_obj_add_style( exit_label, LV_OBJ_PART_MAIN, &battery_view_style );
-    lv_label_set_text( exit_label, "battery");
+    lv_label_set_text( exit_label, "battery / energy");
     lv_obj_align( exit_label, exit_btn, LV_ALIGN_OUT_RIGHT_MID, 5, 0 );
 
     lv_obj_t *battery_design_cont = lv_obj_create( battery_view_tile, NULL );
@@ -163,15 +164,18 @@ void battery_view_tile_setup( uint32_t tile_num ) {
     lv_label_set_text( vbus_view_voltage, "2.4mV");
     lv_obj_align( vbus_view_voltage, vbus_voltage_cont, LV_ALIGN_IN_RIGHT_MID, -5, 0 );
 
+    mainbar_add_tile_activate_cb( battery_view_tile_num, battery_activate_cb );
+    mainbar_add_tile_activate_cb( battery_view_tile_num + 1, battery_activate_cb );
+    mainbar_add_tile_hibernate_cb( battery_view_tile_num, battery_hibernate_cb );
+    mainbar_add_tile_hibernate_cb( battery_view_tile_num + 1, battery_hibernate_cb );
+}
+
+void battery_activate_cb( void ) {
     battery_view_task = lv_task_create(battery_view_update_task, 1000,  LV_TASK_PRIO_LOWEST, NULL );
 }
 
-static void enter_battery_view_event_cb( lv_obj_t * obj, lv_event_t event ) {
-    switch( event ) {
-        case( LV_EVENT_CLICKED ):       mainbar_jump_to_tilenumber( battery_view_tile_num, LV_ANIM_OFF );
-                                        break;
-    }
-
+void battery_hibernate_cb( void ) {
+    lv_task_del( battery_view_task );
 }
 
 static void enter_battery_settings_event_cb( lv_obj_t * obj, lv_event_t event ) {

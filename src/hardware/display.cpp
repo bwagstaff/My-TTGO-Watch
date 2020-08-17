@@ -26,6 +26,8 @@
 #include "powermgm.h"
 #include "motor.h"
 
+#include "json_psram_allocator.h"
+
 display_config_t display_config;
 
 static uint8_t dest_brightness = 0;
@@ -69,7 +71,7 @@ void display_loop( TTGOClass *ttgo ) {
 
 void display_standby( void ) {
   TTGOClass *ttgo = TTGOClass::getWatch();
-  log_i("standby");
+  log_i("go standby");
   ttgo->bl->adjust( 0 );
   ttgo->displaySleep();
   ttgo->closeBL();
@@ -77,12 +79,21 @@ void display_standby( void ) {
   dest_brightness = 0;
 }
 
-void display_wakeup( void ) {
+void display_wakeup( bool silence ) {
   TTGOClass *ttgo = TTGOClass::getWatch();
 
-  // normal wake up from standby
-  if ( powermgm_get_event( POWERMGM_PMU_BUTTON | POWERMGM_PMU_BATTERY | POWERMGM_BMA_WAKEUP ) ) {
-    log_i("wakeup");
+  // wakeup without display
+  if ( silence ) {
+    log_i("go silence wakeup");
+    ttgo->openBL();
+    ttgo->displayWakeup();
+    ttgo->bl->adjust( 0 );
+    brightness = 0;
+    dest_brightness = 0;
+  }
+  // wakeup with display
+  else {
+    log_i("go wakeup");
     ttgo->openBL();
     ttgo->displayWakeup();
     ttgo->bl->adjust( 0 );
@@ -90,52 +101,86 @@ void display_wakeup( void ) {
     dest_brightness = display_get_brightness();
     motor_vibe( 1 );
   }
-  // silence wakeup request from standby
-  else if ( powermgm_get_event( POWERMGM_SILENCE_WAKEUP_REQUEST ) ) {
-    log_i("silence wakeup");
-    ttgo->openBL();
-    ttgo->displayWakeup();
-    ttgo->bl->adjust( 0 );
-    brightness = 0;
-    dest_brightness = 0;
-    powermgm_set_event( POWERMGM_SILENCE_WAKEUP );
-  }
 }
 
 /*
  *
  */
 void display_save_config( void ) {
-  fs::File file = SPIFFS.open( DISPLAY_CONFIG_FILE, FILE_WRITE );
+    if ( SPIFFS.exists( DISPLAY_CONFIG_FILE ) ) {
+        SPIFFS.remove( DISPLAY_CONFIG_FILE );
+        log_i("remove old binary display config");
+    }
 
-  if ( !file ) {
-    log_e("Can't save file: %s", DISPLAY_CONFIG_FILE );
-  }
-  else {
-    file.write( (uint8_t *)&display_config, sizeof( display_config ) );
+    fs::File file = SPIFFS.open( DISPLAY_JSON_CONFIG_FILE, FILE_WRITE );
+
+    if (!file) {
+        log_e("Can't open file: %s!", DISPLAY_JSON_CONFIG_FILE );
+    }
+    else {
+        SpiRamJsonDocument doc( 1000 );
+
+        doc["brightness"] = display_config.brightness;
+        doc["rotation"] = display_config.rotation;
+        doc["timeout"] = display_config.timeout;
+        doc["block_return_maintile"] = display_config.block_return_maintile;
+
+        if ( serializeJsonPretty( doc, file ) == 0) {
+            log_e("Failed to write config file");
+        }
+        doc.clear();
+    }
     file.close();
-  }
 }
 
 /*
  *
  */
 void display_read_config( void ) {
-  fs::File file = SPIFFS.open( DISPLAY_CONFIG_FILE, FILE_READ );
+    if ( SPIFFS.exists( DISPLAY_JSON_CONFIG_FILE ) ) {        
+        fs::File file = SPIFFS.open( DISPLAY_JSON_CONFIG_FILE, FILE_READ );
+        if (!file) {
+            log_e("Can't open file: %s!", DISPLAY_JSON_CONFIG_FILE );
+        }
+        else {
+            int filesize = file.size();
+            SpiRamJsonDocument doc( filesize * 2 );
 
-  if (!file) {
-    log_e("Can't open file: %s!", DISPLAY_CONFIG_FILE );
-  }
-  else {
-    int filesize = file.size();
-    if ( filesize > sizeof( display_config ) ) {
-      log_e("Failed to read configfile. Wrong filesize!" );
+            DeserializationError error = deserializeJson( doc, file );
+            if ( error ) {
+                log_e("update check deserializeJson() failed: %s", error.c_str() );
+            }
+            else {
+                display_config.brightness = doc["brightness"].as<uint32_t>();
+                display_config.rotation = doc["rotation"].as<uint32_t>();
+                display_config.timeout = doc["timeout"].as<uint32_t>();
+                display_config.block_return_maintile = doc["block_return_maintile"].as<bool>();
+            }        
+            doc.clear();
+        }
+        file.close();
     }
     else {
-      file.read( (uint8_t *)&display_config, filesize );
+        log_i("no json config exists, read from binary");
+        fs::File file = SPIFFS.open( DISPLAY_CONFIG_FILE, FILE_READ );
+
+        if (!file) {
+            log_e("Can't open file: %s!", DISPLAY_CONFIG_FILE );
+        }
+        else {
+            int filesize = file.size();
+            if ( filesize > sizeof( display_config ) ) {
+                log_e("Failed to read configfile. Wrong filesize!" );
+            }
+            else {
+                file.read( (uint8_t *)&display_config, filesize );
+                file.close();
+                display_save_config();
+                return; 
+            }
+        file.close();
+        }
     }
-    file.close();
-  }
 }
 
 uint32_t display_get_timeout( void ) {
@@ -157,6 +202,14 @@ void display_set_brightness( uint32_t brightness ) {
 
 uint32_t display_get_rotation( void ) {
   return( display_config.rotation );
+}
+
+bool display_get_block_return_maintile( void ) {
+  return( display_config.block_return_maintile );
+}
+
+void display_set_block_return_maintile( bool block_return_maintile ) {
+  display_config.block_return_maintile = block_return_maintile;
 }
 
 void display_set_rotation( uint32_t rotation ) {
