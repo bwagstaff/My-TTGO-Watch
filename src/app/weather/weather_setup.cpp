@@ -30,6 +30,10 @@
 #include "gui/statusbar.h"
 #include "gui/keyboard.h"
 
+#include "hardware/blectl.h"
+#include "hardware/motor.h"
+#include "hardware/json_psram_allocator.h"
+
 lv_obj_t *weather_setup_tile = NULL;
 lv_style_t weather_setup_style;
 uint32_t weather_setup_tile_num;
@@ -40,6 +44,7 @@ lv_obj_t *weather_lat_textfield = NULL;
 lv_obj_t *weather_lon_textfield = NULL;
 lv_obj_t *weather_autosync_onoff = NULL;
 lv_obj_t *weather_wind_onoff = NULL;
+lv_obj_t *weather_imperial_onoff = NULL;
 lv_style_t weather_widget_setup_style;
 
 LV_IMG_DECLARE(exit_32px);
@@ -48,6 +53,10 @@ static void weather_textarea_event_cb( lv_obj_t * obj, lv_event_t event );
 static void exit_weather_widget_setup_event_cb( lv_obj_t * obj, lv_event_t event );
 static void weather_autosync_onoff_event_handler( lv_obj_t * obj, lv_event_t event );
 static void weather_wind_onoff_event_handler( lv_obj_t *obj, lv_event_t event );
+static void weather_imperial_onoff_event_handler( lv_obj_t *obj, lv_event_t event );
+
+static void bluetooth_message_event_cb( EventBits_t event, char* msg );
+static void bluetooth_message_msg_pharse( char* msg );
 
 void weather_setup_tile_setup( uint32_t tile_num ) {
 
@@ -77,7 +86,7 @@ void weather_setup_tile_setup( uint32_t tile_num ) {
     lv_obj_align( exit_label, exit_btn, LV_ALIGN_OUT_RIGHT_MID, 5, 0 );
 /*
     lv_obj_t *weather_geolocation_cont = lv_obj_create( weather_setup_tile, NULL );
-    lv_obj_set_size( weather_geolocation_cont, LV_HOR_RES_MAX , 32);
+    lv_obj_set_size( weather_geolocation_cont, lv_disp_get_hor_res( NULL ) , 32);
     lv_obj_add_style( weather_geolocation_cont, LV_OBJ_PART_MAIN, &weather_setup_style  );
     lv_obj_align( weather_geolocation_cont, weather_setup_tile, LV_ALIGN_IN_TOP_MID, 0, 49 );
     weather_geolocation_onoff = lv_switch_create( weather_geolocation_cont, NULL );
@@ -92,7 +101,7 @@ void weather_setup_tile_setup( uint32_t tile_num ) {
     lv_obj_align( weather_geolocation_label, weather_geolocation_cont, LV_ALIGN_IN_LEFT_MID, 5, 0 );
 */
     lv_obj_t *weather_apikey_cont = lv_obj_create( weather_setup_tile, NULL );
-    lv_obj_set_size(weather_apikey_cont, LV_HOR_RES_MAX , 40);
+    lv_obj_set_size(weather_apikey_cont, lv_disp_get_hor_res( NULL ) , 40);
     lv_obj_add_style( weather_apikey_cont, LV_OBJ_PART_MAIN, &weather_setup_style  );
     lv_obj_align( weather_apikey_cont, weather_setup_tile, LV_ALIGN_IN_TOP_MID, 0, 49 );
     lv_obj_t *weather_apikey_label = lv_label_create( weather_apikey_cont, NULL);
@@ -109,7 +118,7 @@ void weather_setup_tile_setup( uint32_t tile_num ) {
     lv_obj_set_event_cb( weather_apikey_textfield, weather_textarea_event_cb );
 
     lv_obj_t *weather_lat_cont = lv_obj_create( weather_setup_tile, NULL );
-    lv_obj_set_size(weather_lat_cont, LV_HOR_RES_MAX / 2 , 40 );
+    lv_obj_set_size(weather_lat_cont, lv_disp_get_hor_res( NULL ) / 2 , 40 );
     lv_obj_add_style( weather_lat_cont, LV_OBJ_PART_MAIN, &weather_setup_style  );
     lv_obj_align( weather_lat_cont, weather_apikey_cont, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 0 );
     lv_obj_t *weather_lat_label = lv_label_create( weather_lat_cont, NULL);
@@ -121,12 +130,12 @@ void weather_setup_tile_setup( uint32_t tile_num ) {
     lv_textarea_set_pwd_mode( weather_lat_textfield, false);
     lv_textarea_set_one_line( weather_lat_textfield, true);
     lv_textarea_set_cursor_hidden( weather_lat_textfield, true);
-    lv_obj_set_width( weather_lat_textfield, LV_HOR_RES / 4 );
+    lv_obj_set_width( weather_lat_textfield, lv_disp_get_hor_res( NULL ) / 4 );
     lv_obj_align( weather_lat_textfield, weather_lat_cont, LV_ALIGN_IN_RIGHT_MID, -5, 0 );
     lv_obj_set_event_cb( weather_lat_textfield, weather_textarea_event_cb );
 
     lv_obj_t *weather_lon_cont = lv_obj_create( weather_setup_tile, NULL );
-    lv_obj_set_size(weather_lon_cont, LV_HOR_RES_MAX / 2 , 40 );
+    lv_obj_set_size(weather_lon_cont, lv_disp_get_hor_res( NULL ) / 2 , 40 );
     lv_obj_add_style( weather_lon_cont, LV_OBJ_PART_MAIN, &weather_setup_style  );
     lv_obj_align( weather_lon_cont, weather_apikey_cont, LV_ALIGN_OUT_BOTTOM_RIGHT, 0, 0 );
     lv_obj_t *weather_lon_label = lv_label_create( weather_lon_cont, NULL);
@@ -138,12 +147,12 @@ void weather_setup_tile_setup( uint32_t tile_num ) {
     lv_textarea_set_pwd_mode( weather_lon_textfield, false);
     lv_textarea_set_one_line( weather_lon_textfield, true);
     lv_textarea_set_cursor_hidden( weather_lon_textfield, true);
-    lv_obj_set_width( weather_lon_textfield, LV_HOR_RES / 4 );
+    lv_obj_set_width( weather_lon_textfield, lv_disp_get_hor_res( NULL ) / 4 );
     lv_obj_align( weather_lon_textfield, weather_lon_cont, LV_ALIGN_IN_RIGHT_MID, -5, 0 );
     lv_obj_set_event_cb( weather_lon_textfield, weather_textarea_event_cb );
 
     lv_obj_t *weather_autosync_cont = lv_obj_create( weather_setup_tile, NULL );
-    lv_obj_set_size( weather_autosync_cont, LV_HOR_RES_MAX , 32);
+    lv_obj_set_size( weather_autosync_cont, lv_disp_get_hor_res( NULL ) , 32);
     lv_obj_add_style( weather_autosync_cont, LV_OBJ_PART_MAIN, &weather_setup_style  );
     lv_obj_align( weather_autosync_cont, weather_lat_cont, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 5 );
     weather_autosync_onoff = lv_switch_create( weather_autosync_cont, NULL );
@@ -158,7 +167,7 @@ void weather_setup_tile_setup( uint32_t tile_num ) {
     lv_obj_align( weather_autosync_label, weather_autosync_cont, LV_ALIGN_IN_LEFT_MID, 5, 0 );
 
     lv_obj_t *weather_wind_cont = lv_obj_create( weather_setup_tile, NULL);
-    lv_obj_set_size( weather_wind_cont, LV_HOR_RES_MAX, 32);
+    lv_obj_set_size( weather_wind_cont, lv_disp_get_hor_res( NULL ), 32);
     lv_obj_add_style( weather_wind_cont, LV_OBJ_PART_MAIN, &weather_setup_style );
     lv_obj_align( weather_wind_cont, weather_autosync_cont, LV_ALIGN_OUT_BOTTOM_MID, 0, 0 );
     weather_wind_onoff = lv_switch_create( weather_wind_cont, NULL);
@@ -172,6 +181,21 @@ void weather_setup_tile_setup( uint32_t tile_num ) {
     lv_label_set_text( weather_wind_label, "Display wind");
     lv_obj_align( weather_wind_label, weather_wind_cont, LV_ALIGN_IN_LEFT_MID, 5, 0);
 
+    lv_obj_t *weather_imperial_cont = lv_obj_create( weather_setup_tile, NULL);
+    lv_obj_set_size( weather_imperial_cont, lv_disp_get_hor_res( NULL ), 32);
+    lv_obj_add_style( weather_imperial_cont, LV_OBJ_PART_MAIN, &weather_setup_style );
+    lv_obj_align( weather_imperial_cont, weather_wind_cont, LV_ALIGN_OUT_BOTTOM_MID, 0, 0 );
+    weather_imperial_onoff = lv_switch_create( weather_imperial_cont, NULL);
+    lv_obj_add_protect( weather_imperial_onoff, LV_PROTECT_CLICK_FOCUS);
+    lv_obj_add_style( weather_imperial_onoff, LV_SWITCH_PART_INDIC, mainbar_get_switch_style() );
+    lv_switch_off( weather_imperial_onoff, LV_ANIM_ON);
+    lv_obj_align( weather_imperial_onoff, weather_imperial_cont, LV_ALIGN_IN_RIGHT_MID, -5, 0);
+    lv_obj_set_event_cb( weather_imperial_onoff, weather_imperial_onoff_event_handler);
+    lv_obj_t *weather_imperial_label = lv_label_create(weather_imperial_cont, NULL);
+    lv_obj_add_style( weather_imperial_label, LV_OBJ_PART_MAIN, &weather_setup_style );
+    lv_label_set_text( weather_imperial_label, "Use Imperial");
+    lv_obj_align( weather_imperial_label, weather_imperial_cont, LV_ALIGN_IN_LEFT_MID, 5, 0);
+
     if ( weather_config->autosync)
         lv_switch_on(weather_autosync_onoff, LV_ANIM_OFF);
     else
@@ -181,6 +205,13 @@ void weather_setup_tile_setup( uint32_t tile_num ) {
         lv_switch_on( weather_wind_onoff, LV_ANIM_OFF );
     else
         lv_switch_off( weather_wind_onoff, LV_ANIM_OFF );
+
+    if ( weather_config->imperial )
+        lv_switch_on( weather_imperial_onoff, LV_ANIM_OFF );
+    else
+        lv_switch_off( weather_imperial_onoff, LV_ANIM_OFF );
+
+    blectl_register_cb( BLECTL_MSG, bluetooth_message_event_cb );
 }
 
 static void weather_textarea_event_cb( lv_obj_t * obj, lv_event_t event ) {
@@ -206,15 +237,62 @@ static void weather_wind_onoff_event_handler(lv_obj_t *obj, lv_event_t event)
     }
 }
 
+static void weather_imperial_onoff_event_handler(lv_obj_t *obj, lv_event_t event)
+{
+    switch (event) {
+        case ( LV_EVENT_VALUE_CHANGED ):    weather_config_t *weather_config = weather_get_config();
+                                            weather_config->imperial = lv_switch_get_state( obj );
+                                            break;
+    }
+}
+
 static void exit_weather_widget_setup_event_cb( lv_obj_t * obj, lv_event_t event ) {
     switch( event ) {
         case( LV_EVENT_CLICKED ):           keyboard_hide();
                                             weather_config_t *weather_config = weather_get_config();
-                                            strcpy( weather_config->apikey, lv_textarea_get_text( weather_apikey_textfield ) );
-                                            strcpy( weather_config->lat, lv_textarea_get_text( weather_lat_textfield ) );
-                                            strcpy( weather_config->lon, lv_textarea_get_text( weather_lon_textfield ) );
+                                            strlcpy( weather_config->apikey, lv_textarea_get_text( weather_apikey_textfield ), sizeof( weather_config->apikey ) );
+                                            strlcpy( weather_config->lat, lv_textarea_get_text( weather_lat_textfield ), sizeof( weather_config->lat ) );
+                                            strlcpy( weather_config->lon, lv_textarea_get_text( weather_lon_textfield ), sizeof( weather_config->lon ) );
                                             weather_save_config();
                                             weather_jump_to_forecast();
                                             break;
     }
+}
+
+
+static void bluetooth_message_event_cb( EventBits_t event, char* msg ) {
+    switch( event ) {
+        case BLECTL_MSG:            bluetooth_message_msg_pharse( msg );
+                                    break;
+    }
+}
+
+void bluetooth_message_msg_pharse( char* msg ) {
+
+    SpiRamJsonDocument doc( strlen( msg ) * 2 );
+
+    DeserializationError error = deserializeJson( doc, msg );
+    if ( error ) {
+        log_e("bluetooth message deserializeJson() failed: %s", error.c_str() );
+    }
+    else {
+        if( !strcmp( doc["t"], "conf" ) ) {
+            if ( !strcmp( doc["app"], "weather" ) ) {
+
+                weather_config_t *weather_config = weather_get_config();
+                strlcpy( weather_config->apikey, doc["apikey"] |"", sizeof( weather_config->apikey ) );
+                strlcpy( weather_config->lat, doc["lat"] | "", sizeof( weather_config->lat ) );
+                strlcpy( weather_config->lon, doc["lon"] | "", sizeof( weather_config->lon ) );
+                weather_save_config();
+
+                lv_textarea_set_text( weather_apikey_textfield, weather_config->apikey );
+                lv_textarea_set_text( weather_lat_textfield, weather_config->lat );
+                lv_textarea_set_text( weather_lon_textfield, weather_config->lon );
+
+                motor_vibe(100);
+            }
+
+        }
+    }        
+    doc.clear();
 }

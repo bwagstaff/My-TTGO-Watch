@@ -30,6 +30,8 @@
 #include "hardware/wifictl.h"
 #include "hardware/motor.h"
 #include "webserver/webserver.h"
+#include "hardware/blectl.h"
+#include "hardware/json_psram_allocator.h"
 
 #include <WiFi.h>
 
@@ -60,6 +62,9 @@ static void exit_wifi_setup_event_cb( lv_obj_t * obj, lv_event_t event );
 static void wifi_onoff_event_handler(lv_obj_t * obj, lv_event_t event);
 void wifi_settings_enter_pass_event_cb( lv_obj_t * obj, lv_event_t event );
 void WiFiScanDone(WiFiEvent_t event, WiFiEventInfo_t info);
+
+static void bluetooth_message_event_cb( EventBits_t event, char* msg );
+static void bluetooth_message_msg_pharse( char* msg );
 
 LV_IMG_DECLARE(lock_16px);
 LV_IMG_DECLARE(unlock_16px);
@@ -125,7 +130,7 @@ void wlan_settings_tile_setup( void ) {
     lv_obj_set_event_cb( wifi_onoff, wifi_onoff_event_handler);
 
     wifiname_list = lv_list_create( wifi_settings_tile, NULL);
-    lv_obj_set_size( wifiname_list, LV_HOR_RES_MAX, 160);
+    lv_obj_set_size( wifiname_list, lv_disp_get_hor_res( NULL ), 160);
     lv_style_init( &wifi_list_style  );
     lv_style_set_border_width( &wifi_list_style , LV_OBJ_PART_MAIN, 0);
     lv_style_set_radius( &wifi_list_style , LV_OBJ_PART_MAIN, 0);
@@ -230,13 +235,13 @@ void wlan_password_tile_setup( uint32_t wifi_password_tile_num ) {
     lv_textarea_set_pwd_mode( wifi_password_pass_textfield, false);
     lv_textarea_set_one_line( wifi_password_pass_textfield, true);
     lv_textarea_set_cursor_hidden( wifi_password_pass_textfield, true);
-    lv_obj_set_width( wifi_password_pass_textfield, LV_HOR_RES );
+    lv_obj_set_width( wifi_password_pass_textfield, lv_disp_get_hor_res( NULL ) );
     lv_obj_align( wifi_password_pass_textfield, wifi_password_tile, LV_ALIGN_IN_TOP_LEFT, 0, 75);
     lv_obj_set_event_cb( wifi_password_pass_textfield, wlan_password_event_cb );
 
     lv_obj_t *mac_label = lv_label_create( wifi_password_tile, NULL);
     lv_obj_add_style( mac_label, LV_IMGBTN_PART_MAIN, &wifi_password_style );
-    lv_obj_set_width( mac_label, LV_HOR_RES);
+    lv_obj_set_width( mac_label, lv_disp_get_hor_res( NULL ) );
     lv_obj_align( mac_label, wifi_password_tile, LV_ALIGN_IN_BOTTOM_LEFT, 0, 0);
     lv_label_set_text_fmt( mac_label, "MAC: %s", WiFi.macAddress().c_str());
 
@@ -323,7 +328,7 @@ void wlan_setup_tile_setup( uint32_t wifi_setup_tile_num ) {
     lv_obj_align( exit_label, exit_btn, LV_ALIGN_OUT_RIGHT_MID, 5, 0 );
 
     lv_obj_t *wifi_autoon_onoff_cont = lv_obj_create( wifi_setup_tile, NULL );
-    lv_obj_set_size(wifi_autoon_onoff_cont, LV_HOR_RES_MAX , 40);
+    lv_obj_set_size(wifi_autoon_onoff_cont, lv_disp_get_hor_res( NULL ) , 40);
     lv_obj_add_style( wifi_autoon_onoff_cont, LV_OBJ_PART_MAIN, &wifi_setup_style  );
     lv_obj_align( wifi_autoon_onoff_cont, wifi_setup_tile, LV_ALIGN_IN_TOP_RIGHT, 0, 75 );
 
@@ -339,7 +344,7 @@ void wlan_setup_tile_setup( uint32_t wifi_setup_tile_num ) {
     lv_obj_align( wifi_autoon_label, wifi_autoon_onoff_cont, LV_ALIGN_IN_LEFT_MID, 5, 0 );
 
     lv_obj_t *wifi_webserver_onoff_cont = lv_obj_create( wifi_setup_tile, NULL );
-    lv_obj_set_size(wifi_webserver_onoff_cont, LV_HOR_RES_MAX , 40);
+    lv_obj_set_size(wifi_webserver_onoff_cont, lv_disp_get_hor_res( NULL ) , 40);
     lv_obj_add_style( wifi_webserver_onoff_cont, LV_OBJ_PART_MAIN, &wifi_setup_style  );
     lv_obj_align( wifi_webserver_onoff_cont, wifi_autoon_onoff_cont, LV_ALIGN_OUT_BOTTOM_MID, 0, 0 );
 
@@ -369,6 +374,8 @@ void wlan_setup_tile_setup( uint32_t wifi_setup_tile_num ) {
         lv_switch_on( wifi_webserver_onoff, LV_ANIM_OFF);
     else
         lv_switch_off( wifi_webserver_onoff, LV_ANIM_OFF);
+
+    blectl_register_cb( BLECTL_MSG, bluetooth_message_event_cb );
 }
 
 static void wps_start_event_handler( lv_obj_t * obj, lv_event_t event ) {
@@ -410,4 +417,35 @@ static void wifi_webserver_onoff_event_handler( lv_obj_t * obj, lv_event_t event
                                         }
                                         break;
     }
+}
+
+
+
+static void bluetooth_message_event_cb( EventBits_t event, char* msg ) {
+    switch( event ) {
+        case BLECTL_MSG:            bluetooth_message_msg_pharse( msg );
+                                    break;
+    }
+}
+
+void bluetooth_message_msg_pharse( char* msg ) {
+
+    SpiRamJsonDocument doc( strlen( msg ) * 2 );
+
+    DeserializationError error = deserializeJson( doc, msg );
+    if ( error ) {
+        log_e("bluetooth message deserializeJson() failed: %s", error.c_str() );
+    }
+    else {
+        if( !strcmp( doc["t"], "conf" ) ) {
+             if ( !strcmp( doc["app"], "settings" ) ) {
+                if ( !strcmp( doc["settings"], "wlan" ) ) {
+                    motor_vibe(100);
+                    wifictl_insert_network(  doc["ssid"] |"" , doc["key"] |"" );
+                }
+             }
+
+        }
+    }        
+    doc.clear();
 }

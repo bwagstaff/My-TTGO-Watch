@@ -1,5 +1,5 @@
 /****************************************************************************
- *   Aug 3 22:21:17 2020
+ *   Aug 18 12:37:31 2020
  *   Copyright  2020  Dirk Brosswick
  *   Email: dirk.brosswick@googlemail.com
  ****************************************************************************/
@@ -19,17 +19,19 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
-#ifndef _SOUND_H
-    #define _SOUND_H
+#ifndef _BLUETOOTH_MESSAGE_H
+    #define _BLUETOOTH_MESSAGE_H
 
     #include <TTGO.h>
 
-    #define SOUND_EVENT_PLAYING             _BV(0)
-    #define SOUND_EVENT_STARTUP             _BV(1)
-    #define SOUND_EVENT_NOTIFICATION        _BV(2)
+    struct src_icon_t {
+        const char src_name[ 24 ];
+        const int32_t vibe;
+        const lv_img_dsc_t *img;
+    };
 
-    #define I2S_PORT              I2S_NUM_0
+    void bluetooth_message_tile_setup( void );
+    void bluetooth_message_disable( void );
+    void bluetooth_message_enable( void );
 
-    void sound_setup( void );
-
-#endif // _EXAMPLE_APP_H
+#endif // _BLUETOOTH_MESSAGE_H

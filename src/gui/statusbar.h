@@ -26,7 +26,7 @@
     #include "config.h"
 
     #define STATUSBAR_HEIGHT            26
-    #define STATUSBAR_EXPAND_HEIGHT     128
+    #define STATUSBAR_EXPAND_HEIGHT     160
 
     typedef struct {
         lv_obj_t *icon;
@@ -42,6 +42,7 @@
         STATUSBAR_WIFI,
         STATUSBAR_BELL,
         STATUSBAR_WARNING,
+        STATUSBAR_ALARM,
         STATUSBAR_NUM
     } statusbar_icon_t;
     
@@ -104,6 +105,7 @@
      * @param   wifiname    label to displayed text like "scan","connecting" and so on
      */
     void statusbar_wifi_set_state( bool state, const char *wifiname );
+    void statusbar_wifi_set_ip_state( bool state, const char *ip );
     void statusbar_bluetooth_set_state( bool state );
     /*
      * @brief hide the statusbar

@@ -49,7 +49,7 @@ lv_obj_t *weather_forecast_icon_imgbtn[ WEATHER_MAX_FORECAST ];
 lv_obj_t *weather_forecast_temperature_label[ WEATHER_MAX_FORECAST ];
 lv_obj_t *weather_forecast_wind_label[ WEATHER_MAX_FORECAST ];
 
-weather_forcast_t weather_forecast[ WEATHER_MAX_FORECAST ];
+static weather_forcast_t *weather_forecast = NULL;
 
 void weather_forecast_sync_Task( void * pvParameters );
 void weather_forecast_wifictl_event_cb( EventBits_t event, char* msg );
@@ -64,6 +64,13 @@ static void setup_weather_widget_event_cb( lv_obj_t * obj, lv_event_t event );
 static void refresh_weather_widget_event_cb( lv_obj_t * obj, lv_event_t event );
 
 void weather_forecast_tile_setup( uint32_t tile_num ) {
+
+    weather_forecast = (weather_forcast_t*)ps_calloc( sizeof( weather_forcast_t ) * WEATHER_MAX_FORECAST , 1 );
+    if( !weather_forecast ) {
+      log_e("weather forecast calloc faild");
+      while(true);
+    }
+
     weather_forecast_tile_num = tile_num;
     weather_forecast_tile = mainbar_get_tile_obj( weather_forecast_tile_num );
     lv_style_copy( &weather_forecast_style, mainbar_get_style() );
@@ -106,7 +113,7 @@ void weather_forecast_tile_setup( uint32_t tile_num ) {
     lv_obj_align( weather_forecast_update_label, weather_forecast_location_label, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 0 );
 
     lv_obj_t * weater_forecast_cont = lv_obj_create( weather_forecast_tile, NULL );
-    lv_obj_set_size( weater_forecast_cont, LV_HOR_RES_MAX , 96 );
+    lv_obj_set_size( weater_forecast_cont, lv_disp_get_hor_res( NULL ) , 96 );
     lv_obj_add_style( weater_forecast_cont, LV_OBJ_PART_MAIN, &weather_forecast_style  );
     lv_obj_align( weater_forecast_cont, weather_forecast_tile, LV_ALIGN_CENTER, 0, 0 );
 
@@ -141,6 +148,8 @@ void weather_forecast_tile_setup( uint32_t tile_num ) {
 }
 
 void weather_forecast_wifictl_event_cb( EventBits_t event, char* msg ) {
+    log_i("weather forecast wifictl event: %04x", event );
+    
     switch( event ) {
         case WIFICTL_CONNECT:       weather_config_t *tmp_weather_config = weather_get_config();
                                     if ( tmp_weather_config->autosync ) {
@@ -191,7 +200,7 @@ void weather_forecast_sync_Task( void * pvParameters ) {
     weather_config_t *weather_config = weather_get_config();
     int32_t retval = -1;
 
-    log_i("start weather forecast task");
+    log_i("start weather forecast task, heap: %d", ESP.getFreeHeap() );
 
     vTaskDelay( 250 );
 
@@ -240,5 +249,6 @@ void weather_forecast_sync_Task( void * pvParameters ) {
         }
     }
     xEventGroupClearBits( weather_forecast_event_handle, WEATHER_FORECAST_SYNC_REQUEST );
+    log_i("finsh weather forecast task, heap: %d", ESP.getFreeHeap() );
     vTaskDelete( NULL );
 }

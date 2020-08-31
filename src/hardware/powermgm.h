@@ -32,19 +32,17 @@
     #define POWERMGM_WAKEUP_REQUEST             _BV(5)
     #define POWERMGM_PMU_BUTTON                 _BV(6)
     #define POWERMGM_BMA_DOUBLECLICK            _BV(9)
+    #define POWERMGM_BMA_TILT                   _BV(10)
+    #define POWERMGM_RTC_ALARM                  _BV(11)
 
     /*
      * @brief setp power managment, coordinate managment beween CPU, wifictl, pmu, bma, display, backlight and lvgl
-     * 
-     * @param   ttgo    pointer to an TTGOClass
      */
-    void powermgm_setup( TTGOClass *ttgo );
+    void powermgm_setup( void );
     /*
      * @brief power managment loop routine, call from loop. not for user use
-     * 
-     * @param   ttgo    pointer to an TTGOClass
      */
-    void powermgm_loop( TTGOClass *ttgo );
+    void powermgm_loop( void );
     /*
      * @brief trigger a power managemt event
      * 
@@ -61,6 +59,8 @@
      * @brief get a power managemt event state
      * 
      * @param   bits    event state, example: POWERMGM_STANDBY to evaluate if the system in standby
+     * 
+     * @return  EventBits_t    event state
      */
     EventBits_t powermgm_get_event( EventBits_t bits );
 

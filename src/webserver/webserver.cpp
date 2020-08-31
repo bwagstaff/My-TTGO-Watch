@@ -36,6 +36,7 @@
 AsyncWebServer asyncserver( WEBSERVERPORT );
 TaskHandle_t _WEBSERVER_Task;
 
+
   static const char* serverIndex =
     "<!DOCTYPE html>\n <html><head>\n <script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>"
     "\n <script src='/jquery.min.js'></script>"
@@ -162,7 +163,7 @@ void asyncwebserver_start(void){
       "<li><a target=\"cont\" href=\"/info\">/info</a> - Display information about the device"
       "<li><a target=\"cont\" href=\"/network\">/network</a> - Display network information"
       "<li><a target=\"cont\" href=\"/shot\">/shot</a> - Capture a screen shot"
-      "<li><a target=\"cont\" href=\"/screen.565\">/screen.565</a> - Retrieve the image in RGB565 format"
+      "<li><a target=\"cont\" href=\"/screen.data\">/screen.data</a> - Retrieve the image in RGB565 format, open it with gimp"
       "<li><a target=\"_blank\" href=\"/edit\">/edit</a> - View, edit, upload, and delete files"
       "</ul>"
       "<p><div style=\"color:red;\">Caution:</div> Use these with care:"
@@ -324,9 +325,9 @@ void asyncwebserver_start(void){
   asyncserver.on("/description.xml", HTTP_GET, [](AsyncWebServerRequest *request) {
     byte mac[6];
     WiFi.macAddress(mac);
-    char tmp[12 + 1];
-    snprintf(tmp, sizeof(tmp), "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    String MacStrPart = String(tmp).substring(6);
+    char tmp[6 + 1];
+    snprintf(tmp, sizeof(tmp), "%02X%02X%02X", mac[3], mac[4], mac[5]);
+    String MacStrPart = String(tmp);
 
     String xmltext = String("<?xml version=\"1.0\"?>\n") +
             "<root xmlns=\"urn:schemas-upnp-org:device-1-0\">\n"

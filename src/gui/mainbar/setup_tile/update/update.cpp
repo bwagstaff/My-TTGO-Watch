@@ -114,7 +114,7 @@ void update_tile_setup( void ) {
     lv_obj_align( exit_label, exit_btn, LV_ALIGN_OUT_RIGHT_MID, 5, 0 );
 
     lv_obj_t *update_version_cont = lv_obj_create( update_settings_tile, NULL );
-    lv_obj_set_size(update_version_cont, LV_HOR_RES_MAX , 40);
+    lv_obj_set_size(update_version_cont, lv_disp_get_hor_res( NULL ) , 40);
     lv_obj_add_style( update_version_cont, LV_OBJ_PART_MAIN, &update_settings_style  );
     lv_obj_align( update_version_cont, update_settings_tile, LV_ALIGN_IN_TOP_RIGHT, 0, 75 );
     lv_obj_t *update_version_label = lv_label_create( update_version_cont, NULL);
@@ -144,8 +144,12 @@ void update_tile_setup( void ) {
 }
 
 void update_wifictl_event_cb( EventBits_t event, char* msg ) {
-    if ( update_setup_get_autosync() ) {
-        update_check_version();
+    log_i("update wifictl event: %04x", event );
+    switch( event ) {
+        case WIFICTL_CONNECT:       if ( update_setup_get_autosync() ) {
+                                    update_check_version();
+                                    break;
+        }
     }
 }
 
@@ -202,10 +206,10 @@ void update_check_version( void ) {
 }
 
 void update_Task( void * pvParameters ) {
-    log_i("start update task");
+    log_i("start update task, heap: %d", ESP.getFreeHeap() );
 
     if ( xEventGroupGetBits( update_event_handle) & UPDATE_GET_VERSION_REQUEST ) {
-        int64_t firmware_version = update_check_new_version();
+        int64_t firmware_version = update_check_new_version( update_setup_get_url() );
         if ( firmware_version > atol( __FIRMWARE__ ) && firmware_version > 0 ) {
             char version_msg[48] = "";
             snprintf( version_msg, sizeof( version_msg ), "new version: %lld", firmware_version );
@@ -218,9 +222,14 @@ void update_Task( void * pvParameters ) {
             lv_obj_align( update_status_label, update_btn, LV_ALIGN_OUT_BOTTOM_MID, 0, 15 );  
             lv_obj_set_hidden( update_info_img, true );
         }
+        else {
+            lv_label_set_text( update_status_label, "get update info failed" );
+            lv_obj_align( update_status_label, update_btn, LV_ALIGN_OUT_BOTTOM_MID, 0, 15 );  
+            lv_obj_set_hidden( update_info_img, true );
+        }
         lv_obj_invalidate( lv_scr_act() );
     }
-    if ( xEventGroupGetBits( update_event_handle) & UPDATE_REQUEST ) {
+    if ( ( xEventGroupGetBits( update_event_handle) & UPDATE_REQUEST ) && ( update_get_url() != NULL ) ) {
         if( WiFi.status() == WL_CONNECTED ) {
 
             uint32_t display_timeout = display_get_timeout();
@@ -233,7 +242,7 @@ void update_Task( void * pvParameters ) {
 
             httpUpdate.rebootOnUpdate( false );
 
-            t_httpUpdate_return ret = httpUpdate.update( client, "http://www.neo-guerillaz.de/ttgo-t-watch2020_v1.ino.bin" );
+            t_httpUpdate_return ret = httpUpdate.update( client, update_get_url() );
 
             switch(ret) {
                 case HTTP_UPDATE_FAILED:
@@ -260,5 +269,6 @@ void update_Task( void * pvParameters ) {
     }
     xEventGroupClearBits( update_event_handle, UPDATE_REQUEST | UPDATE_GET_VERSION_REQUEST );
     lv_disp_trig_activity(NULL);
+    log_i("finish update task, heap: %d", ESP.getFreeHeap() );
     vTaskDelete( NULL );
 }
