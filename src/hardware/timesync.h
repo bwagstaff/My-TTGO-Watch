@@ -35,12 +35,10 @@
         int32_t timezone = 0;
     } timesync_config_t;
 
-        /*
+    /*
      * @brief setup display
-     * 
-     * @param   ttgo    pointer to an TTGOClass
      */
-    void timesync_setup( TTGOClass *ttgo );
+    void timesync_setup( void );
     /*
      * @brief save config for timesync to spiffs
      */
@@ -70,7 +68,7 @@
     /*
      * @brief enable/disable daylight saving
      * 
-     * @param daylightsave  true or false
+     * @param daylightsave  true means daylight save enable, false means disable
      */
     void timesync_set_daylightsave( bool daylightsave );
     /*
@@ -82,7 +80,7 @@
     /*
      * @brief set the current timezone
      * 
-     * @param timezone timezone from UTC-12 to UTC+12
+     * @param timezone  timezone from UTC-12 to UTC+12
      */
     void timesync_set_timezone( int32_t timezone );
     /*

@@ -7,22 +7,24 @@
 #include "pmu.h"
 #include "powermgm.h"
 #include "motor.h"
+#include "blectl.h"
+
 
 #include "gui/statusbar.h"
 
 EventGroupHandle_t pmu_event_handle = NULL;
-
 void IRAM_ATTR pmu_irq( void );
-
 pmu_config_t pmu_config;
 
 /*
  * init the pmu: AXP202 
  */
-void pmu_setup( TTGOClass *ttgo ) {
+void pmu_setup( void ) {
     pmu_event_handle = xEventGroupCreate();
 
     pmu_read_config();
+
+    TTGOClass *ttgo = TTGOClass::getWatch();
 
     // Turn on the IRQ used
     ttgo->power->adc1Enable( AXP202_BATT_VOL_ADC1 | AXP202_BATT_CUR_ADC1 | AXP202_VBUS_VOL_ADC1 | AXP202_VBUS_CUR_ADC1, AXP202_ON);
@@ -32,8 +34,16 @@ void pmu_setup( TTGOClass *ttgo ) {
     // enable coulumb counter
     if ( ttgo->power->EnableCoulombcounter() ) 
         log_e("enable coulumb counter failed!");    
-    if ( ttgo->power->setChargingTargetVoltage( AXP202_TARGET_VOL_4_2V ) )
-        log_e("target voltage set failed!");
+    if ( pmu_config.high_charging_target_voltage ) {
+        log_i("set target voltage to 4.36V");
+        if ( ttgo->power->setChargingTargetVoltage( AXP202_TARGET_VOL_4_36V ) )
+            log_e("target voltage 4.36V set failed!");
+    }
+    else {
+        log_i("set target voltage to 4.2V");
+        if ( ttgo->power->setChargingTargetVoltage( AXP202_TARGET_VOL_4_2V ) )
+            log_e("target voltage 4.2V set failed!");
+    }
     if ( ttgo->power->setChargeControlCur( 300 ) )
         log_e("charge current set failed!");
     if ( ttgo->power->setAdcSamplingRate( AXP_ADC_SAMPLING_RATE_200HZ ) )
@@ -46,7 +56,7 @@ void pmu_setup( TTGOClass *ttgo ) {
 
     // Turn i2s DAC on
     ttgo->power->setLDO3Mode( AXP202_LDO3_MODE_DCIN );
-    ttgo->power->setPowerOutPut(AXP202_LDO3, AXP202_ON );
+    ttgo->power->setPowerOutPut( AXP202_LDO3, AXP202_ON );
 
     pinMode( AXP202_INT, INPUT );
     attachInterrupt( AXP202_INT, &pmu_irq, FALLING );
@@ -82,32 +92,34 @@ void pmu_standby( void ) {
     }
 
     if ( pmu_get_experimental_power_save() ) {
-        ttgo->power->setDCDC3Voltage( 2700 );
-        log_i("go standby, enable 2.7V standby voltage");
+        ttgo->power->setDCDC3Voltage( pmu_config.experimental_power_save_voltage );
+        log_i("go standby, enable %dmV standby voltage", pmu_config.experimental_power_save_voltage );
     } 
     else {
-        ttgo->power->setDCDC3Voltage( 3000 );
-        log_i("go standby, enable 3.0V standby voltage");
+        ttgo->power->setDCDC3Voltage( pmu_config.normal_power_save_voltage );
+        log_i("go standby, enable %dmV standby voltage", pmu_config.normal_power_save_voltage );
     }
-    ttgo->power->setPowerOutPut(AXP202_LDO3, AXP202_OFF );
+    ttgo->power->setPowerOutPut( AXP202_LDO3, AXP202_OFF );
+    ttgo->power->setPowerOutPut( AXP202_LDO2, AXP202_OFF );
 }
 
 void pmu_wakeup( void ) {
     TTGOClass *ttgo = TTGOClass::getWatch();
 
     if ( pmu_get_experimental_power_save() ) {
-        ttgo->power->setDCDC3Voltage( 3000 );
-        log_i("go wakeup, enable 3.0V voltage");
+        ttgo->power->setDCDC3Voltage( pmu_config.experimental_normal_voltage );
+        log_i("go wakeup, enable %dmV voltage", pmu_config.experimental_normal_voltage );
     } 
     else {
-        ttgo->power->setDCDC3Voltage( 3300 );
-        log_i("go wakeup, enable 3.3V voltage");
+        ttgo->power->setDCDC3Voltage( pmu_config.normal_voltage );
+        log_i("go wakeup, enable %dmV voltage", pmu_config.normal_voltage );
     }
 
     ttgo->power->clearTimerStatus();
     ttgo->power->offTimer();
 
     ttgo->power->setPowerOutPut( AXP202_LDO3, AXP202_ON );
+    ttgo->power->setPowerOutPut( AXP202_LDO2, AXP202_ON );
 }
 /*
  *
@@ -124,13 +136,19 @@ void pmu_save_config( void ) {
         log_e("Can't open file: %s!", PMU_JSON_CONFIG_FILE );
     }
     else {
-        SpiRamJsonDocument doc( 1000 );
+        SpiRamJsonDocument doc( 3000 );
 
         doc["silence_wakeup"] = pmu_config.silence_wakeup;
         doc["silence_wakeup_time"] = pmu_config.silence_wakeup_time;
         doc["silence_wakeup_time_vbplug"] = pmu_config.silence_wakeup_time_vbplug;
         doc["experimental_power_save"] = pmu_config.experimental_power_save;
+        doc["normal_voltage"] = pmu_config.normal_voltage;
+        doc["normal_power_save_voltage"] = pmu_config.normal_power_save_voltage;
+        doc["experimental_normal_voltage"] = pmu_config.experimental_normal_voltage;
+        doc["experimental_power_save_voltage"] = pmu_config.experimental_power_save_voltage;
         doc["compute_percent"] = pmu_config.compute_percent;
+        doc["high_charging_target_voltage"] = pmu_config.high_charging_target_voltage;
+        doc["designed_battery_cap"] = pmu_config.designed_battery_cap;
 
         if ( serializeJsonPretty( doc, file ) == 0) {
             log_e("Failed to write config file");
@@ -158,11 +176,17 @@ void pmu_read_config( void ) {
                 log_e("update check deserializeJson() failed: %s", error.c_str() );
             }
             else {
-                pmu_config.silence_wakeup = doc["silence_wakeup"].as<bool>() | false;
-                pmu_config.silence_wakeup_time = doc["compute_percent"].as<int8_t>() | 60;
-                pmu_config.silence_wakeup_time_vbplug = doc["compute_percent"].as<int8_t>() | 3;
-                pmu_config.experimental_power_save = doc["experimental_power_save"].as<bool>() | false;
-                pmu_config.compute_percent = doc["compute_percent"].as<bool>() | false;
+                pmu_config.silence_wakeup = doc["silence_wakeup"] | false;
+                pmu_config.silence_wakeup_time = doc["compute_percent"] | 60;
+                pmu_config.silence_wakeup_time_vbplug = doc["compute_percent"] | 3;
+                pmu_config.experimental_power_save = doc["experimental_power_save"] | false;
+                pmu_config.compute_percent = doc["compute_percent"] | false;
+                pmu_config.high_charging_target_voltage = doc["high_charging_target_voltage"] | false;
+                pmu_config.designed_battery_cap = doc["designed_battery_cap"] | 300;
+                pmu_config.normal_voltage = doc["normal_voltage"] | 3300;
+                pmu_config.normal_power_save_voltage = doc["normal_power_save_voltage"] | 3000;
+                pmu_config.experimental_normal_voltage = doc["experimental_normal_voltage"] | 3000;
+                pmu_config.experimental_power_save_voltage = doc["experimental_power_save_voltage"] | 2700;
             }        
             doc.clear();
         }
@@ -195,6 +219,10 @@ bool pmu_get_silence_wakeup( void ) {
     return( pmu_config.silence_wakeup );
 }
 
+int32_t pmu_get_designed_battery_cap( void ) {
+    return( pmu_config.designed_battery_cap );
+}
+
 void pmu_set_silence_wakeup( bool value ) {
     pmu_config.silence_wakeup = value;
     pmu_save_config();
@@ -221,9 +249,11 @@ void pmu_set_experimental_power_save( bool value ) {
 /*
  * loop routine for handling IRQ in main loop
  */
-void pmu_loop( TTGOClass *ttgo ) {
+void pmu_loop( void ) {
     static uint64_t nextmillis = 0;
     bool updatetrigger = false;
+
+    TTGOClass *ttgo = TTGOClass::getWatch();
 
     /*
      * handle IRQ event
@@ -266,20 +296,58 @@ void pmu_loop( TTGOClass *ttgo ) {
     if ( !powermgm_get_event( POWERMGM_STANDBY ) ) {
         if ( nextmillis < millis() || updatetrigger == true ) {
             nextmillis = millis() + 1000;
-            statusbar_update_battery( pmu_get_battery_percent( ttgo ), ttgo->power->isChargeing(), ttgo->power->isVBUSPlug() );
+            statusbar_update_battery( pmu_get_battery_percent(), ttgo->power->isChargeing(), ttgo->power->isVBUSPlug() );
+            blectl_update_battery( pmu_get_battery_percent(), ttgo->power->isChargeing(), ttgo->power->isVBUSPlug() );
         }
     }
 }
 
-int32_t pmu_get_battery_percent( TTGOClass *ttgo ) {
+int32_t pmu_get_battery_percent( void ) {
+    TTGOClass *ttgo = TTGOClass::getWatch();
+
     if ( ttgo->power->getBattChargeCoulomb() < ttgo->power->getBattDischargeCoulomb() || ttgo->power->getBattVoltage() < 3200 ) {
         ttgo->power->ClearCoulombcounter();
     }
 
     if ( pmu_get_calculated_percent() ) {
-        return( ( ttgo->power->getCoulombData() / PMU_BATTERY_CAP ) * 100 );
+        return( ( ttgo->power->getCoulombData() / pmu_config.designed_battery_cap ) * 100 );
     }
     else {
         return( ttgo->power->getBattPercentage() );
     }
+}
+
+float pmu_get_battery_voltage( void ) {
+    TTGOClass *ttgo = TTGOClass::getWatch();
+    return( ttgo->power->getBattVoltage() );
+}
+
+float pmu_get_battery_charge_current( void ) {
+    TTGOClass *ttgo = TTGOClass::getWatch();
+    return( ttgo->power->getBattChargeCurrent() );
+}
+
+float pmu_get_battery_discharge_current( void ) {
+    TTGOClass *ttgo = TTGOClass::getWatch();
+    return( ttgo->power->getBattDischargeCurrent() );
+}
+
+float pmu_get_vbus_voltage( void ) {
+    TTGOClass *ttgo = TTGOClass::getWatch();
+    return( ttgo->power->getVbusVoltage() );
+}
+
+float pmu_get_coulumb_data( void ) {
+    TTGOClass *ttgo = TTGOClass::getWatch();
+    return( ttgo->power->getCoulombData() );
+}
+
+bool pmu_is_charging( void ) {
+    TTGOClass *ttgo = TTGOClass::getWatch();
+    return( ttgo->power->isChargeing() );
+}
+
+bool pmu_is_vbus_plug( void ) {
+    TTGOClass *ttgo = TTGOClass::getWatch();
+    return( ttgo->power->isVBUSPlug() );
 }

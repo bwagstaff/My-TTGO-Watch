@@ -35,7 +35,7 @@ bool wifi_init = false;
 EventGroupHandle_t wifictl_status = NULL;
 portMUX_TYPE wifictlMux = portMUX_INITIALIZER_UNLOCKED;
 
-wifictl_event_t *wifictl_event_cb_table = NULL;
+wifictl_event_cb_t *wifictl_event_cb_table = NULL;
 uint32_t wifictl_event_cb_entrys = 0;
 void wifictl_send_event_cb( EventBits_t event, char *msg );
 
@@ -46,11 +46,15 @@ TaskHandle_t _wifictl_Task;
 char *wifiname=NULL;
 char *wifipassword=NULL;
 
-struct networklist wifictl_networklist[ NETWORKLIST_ENTRYS ];
+static networklist *wifictl_networklist = NULL;
 wifictl_config_t wifictl_config;
 
 static esp_wps_config_t esp_wps_config;
 
+void wifictl_send_event_cb( EventBits_t event, char *msg );
+void wifictl_set_event( EventBits_t bits );
+bool wifictl_get_event( EventBits_t bits );
+void wifictl_clear_event( EventBits_t bits );
 void wifictl_save_network( void );
 void wifictl_load_network( void );
 void wifictl_save_config( void );
@@ -67,6 +71,12 @@ void wifictl_setup( void ) {
     wifictl_status = xEventGroupCreate();
 
     wifi_init = true;
+
+    wifictl_networklist = (networklist*)ps_calloc( sizeof( networklist ) * NETWORKLIST_ENTRYS, 1 );
+    if( !wifictl_networklist ) {
+      log_e("wifictl_networklist calloc faild");
+      while(true);
+    }
 
     // clean network list table
     for ( int entry = 0 ; entry < NETWORKLIST_ENTRYS ; entry++ ) {
@@ -115,10 +125,8 @@ void wifictl_setup( void ) {
           wifictl_save_config();
         }
         wifictl_clear_event( WIFICTL_OFF_REQUEST | WIFICTL_ON_REQUEST | WIFICTL_SCAN | WIFICTL_WPS_REQUEST  );
-        String label( wifiname );
-        label.concat(' ');
-        label.concat( WiFi.localIP().toString() );
-        wifictl_send_event_cb( WIFICTL_CONNECT, (char *)label.c_str() );
+        wifictl_send_event_cb( WIFICTL_CONNECT, (char*)WiFi.SSID().c_str() );
+        wifictl_send_event_cb( WIFICTL_CONNECT_IP, (char*)WiFi.localIP().toString().c_str() );
         if ( wifictl_config.webserver ) {
           asyncwebserver_start();
         }
@@ -167,10 +175,6 @@ void wifictl_setup( void ) {
     vTaskSuspend( _wifictl_Task );
 }
 
-
-/*
- *
- */
 void wifictl_save_config( void ) {
     if ( SPIFFS.exists( WIFICTL_CONFIG_FILE ) ) {
         SPIFFS.remove( WIFICTL_CONFIG_FILE );
@@ -204,9 +208,6 @@ void wifictl_save_config( void ) {
     file.close();
 }
 
-/*
- *
- */
 void wifictl_load_config( void ) {
     if ( SPIFFS.exists( WIFICTL_JSON_CONFIG_FILE ) ) {        
         fs::File file = SPIFFS.open( WIFICTL_JSON_CONFIG_FILE, FILE_READ );
@@ -312,16 +313,16 @@ void wifictl_register_cb( EventBits_t event, WIFICTL_CALLBACK_FUNC wifictl_event
     wifictl_event_cb_entrys++;
 
     if ( wifictl_event_cb_table == NULL ) {
-        wifictl_event_cb_table = ( wifictl_event_t * )ps_malloc( sizeof( wifictl_event_t ) * wifictl_event_cb_entrys );
+        wifictl_event_cb_table = ( wifictl_event_cb_t * )ps_malloc( sizeof( wifictl_event_cb_t ) * wifictl_event_cb_entrys );
         if ( wifictl_event_cb_table == NULL ) {
             log_e("wifictl_event_cb_table malloc faild");
             while(true);
         }
     }
     else {
-        wifictl_event_t *new_wifictl_event_cb_table = NULL;
+        wifictl_event_cb_t *new_wifictl_event_cb_table = NULL;
 
-        new_wifictl_event_cb_table = ( wifictl_event_t * )ps_realloc( wifictl_event_cb_table, sizeof( wifictl_event_t ) * wifictl_event_cb_entrys );
+        new_wifictl_event_cb_table = ( wifictl_event_cb_t * )ps_realloc( wifictl_event_cb_table, sizeof( wifictl_event_cb_t ) * wifictl_event_cb_entrys );
         if ( new_wifictl_event_cb_table == NULL ) {
             log_e("wifictl_event_cb_table realloc faild");
             while(true);
@@ -337,6 +338,10 @@ void wifictl_register_cb( EventBits_t event, WIFICTL_CALLBACK_FUNC wifictl_event
  *
  */
 void wifictl_send_event_cb( EventBits_t event, char *msg ) {
+    if ( wifictl_event_cb_entrys == 0 ) {
+      return;
+    }
+      
     for ( int entry = 0 ; entry < wifictl_event_cb_entrys ; entry++ ) {
         yield();
         if ( event & wifictl_event_cb_table[ entry ].event ) {
@@ -410,7 +415,7 @@ bool wifictl_insert_network( const char *ssid, const char *password ) {
   // check if existin
   for( int entry = 0 ; entry < NETWORKLIST_ENTRYS; entry++ ) {
     if( !strcmp( ssid, wifictl_networklist[ entry ].ssid ) ) {
-      strncpy( wifictl_networklist[ entry ].password, password, sizeof( wifictl_networklist[ entry ].password ) );
+      strlcpy( wifictl_networklist[ entry ].password, password, sizeof( wifictl_networklist[ entry ].password ) );
       wifictl_save_config();
       WiFi.scanNetworks();
       wifictl_set_event( WIFICTL_SCAN );
@@ -420,8 +425,8 @@ bool wifictl_insert_network( const char *ssid, const char *password ) {
   // check for an emty entry
   for( int entry = 0 ; entry < NETWORKLIST_ENTRYS; entry++ ) {
     if( strlen( wifictl_networklist[ entry ].ssid ) == 0 ) {
-      strncpy( wifictl_networklist[ entry ].ssid, ssid, sizeof( wifictl_networklist[ entry ].ssid ) );
-      strncpy( wifictl_networklist[ entry ].password, password, sizeof( wifictl_networklist[ entry ].password ) );
+      strlcpy( wifictl_networklist[ entry ].ssid, ssid, sizeof( wifictl_networklist[ entry ].ssid ) );
+      strlcpy( wifictl_networklist[ entry ].password, password, sizeof( wifictl_networklist[ entry ].password ) );
       wifictl_save_config();
       WiFi.scanNetworks();
       wifictl_set_event( WIFICTL_SCAN );
@@ -442,7 +447,7 @@ void wifictl_on( void ) {
   while( wifictl_get_event( WIFICTL_OFF_REQUEST | WIFICTL_ON_REQUEST ) ) { 
     yield();
   }
-  wifictl_set_event( WIFICTL_ON_REQUEST );
+  wifictl_set_event( WIFICTL_ON_REQUEST | WIFICTL_FIRST_RUN );
   vTaskResume( _wifictl_Task );
 }
 
@@ -457,6 +462,12 @@ void wifictl_off( void ) {
   while( wifictl_get_event( WIFICTL_OFF_REQUEST | WIFICTL_ON_REQUEST ) ) { 
     yield();
   }
+
+  if ( !wifictl_get_event( WIFICTL_FIRST_RUN ) ) {
+    log_i("wifictl not active, prevent first run crash");
+    return;
+  }
+
   wifictl_set_event( WIFICTL_OFF_REQUEST );
   vTaskResume( _wifictl_Task );
 }
@@ -486,10 +497,10 @@ void wifictl_start_wps( void ) {
 
   esp_wps_config.crypto_funcs = &g_wifi_default_wps_crypto_funcs;
   esp_wps_config.wps_type = ESP_WPS_MODE;
-  strcpy(esp_wps_config.factory_info.manufacturer, ESP_MANUFACTURER);
-  strcpy(esp_wps_config.factory_info.model_number, ESP_MODEL_NUMBER);
-  strcpy(esp_wps_config.factory_info.model_name, ESP_MODEL_NAME);
-  strcpy(esp_wps_config.factory_info.device_name, ESP_DEVICE_NAME);
+  strlcpy( esp_wps_config.factory_info.manufacturer, ESP_MANUFACTURER, sizeof( esp_wps_config.factory_info.manufacturer ) );
+  strlcpy( esp_wps_config.factory_info.model_number, ESP_MODEL_NUMBER, sizeof( esp_wps_config.factory_info.model_number ) );
+  strlcpy( esp_wps_config.factory_info.model_name, ESP_MODEL_NAME, sizeof( esp_wps_config.factory_info.model_name ) );
+  strlcpy( esp_wps_config.factory_info.device_name, ESP_DEVICE_NAME, sizeof( esp_wps_config.factory_info.device_name ) );
 
   WiFi.mode( WIFI_OFF );
   esp_wifi_stop();
@@ -510,6 +521,8 @@ void wifictl_Task( void * pvParameters ) {
   if ( wifi_init == false )
     return;
 
+  log_i("start wifictl task, heap: %d", ESP.getFreeHeap() );
+
   while ( true ) {
     vTaskDelay( 500 );
     if ( wifictl_get_event( WIFICTL_OFF_REQUEST ) && wifictl_get_event( WIFICTL_ON_REQUEST ) ) {
@@ -522,6 +535,7 @@ void wifictl_Task( void * pvParameters ) {
       log_i("request wifictl off done");
     }
     else if ( wifictl_get_event( WIFICTL_ON_REQUEST ) ) {
+      esp_wifi_start();
       WiFi.mode( WIFI_STA );
       log_i("request wifictl on done");
     }

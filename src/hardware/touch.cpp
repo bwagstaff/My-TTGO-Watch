@@ -29,13 +29,14 @@ lv_indev_t *touch_indev = NULL;
 static bool touch_read(lv_indev_drv_t * drv, lv_indev_data_t*data);
 static bool touch_getXY( int16_t &x, int16_t &y );
 
-void touch_setup( TTGOClass *ttgo ) {
+void touch_setup( void ) {
     touch_indev = lv_indev_get_next( NULL );
 
     touch_indev->driver.read_cb = touch_read;
 }
 
 static bool touch_getXY( int16_t &x, int16_t &y ) {
+    
     TTGOClass *ttgo = TTGOClass::getWatch();
     TP_Point p;
     static bool touch_press = false;
@@ -78,10 +79,10 @@ static bool touch_getXY( int16_t &x, int16_t &y ) {
     }
 
     // issue https://github.com/sharandac/My-TTGO-Watch/issues/18 fix
-    float temp_x = ( x - ( LV_HOR_RES_MAX / 2 ) ) * 1.15;
-    float temp_y = ( y - ( LV_VER_RES_MAX / 2 ) ) * 1.0;
-    x = temp_x + ( LV_HOR_RES_MAX / 2 );
-    y = temp_y + ( LV_VER_RES_MAX / 2 );
+    float temp_x = ( x - ( lv_disp_get_hor_res( NULL ) / 2 ) ) * 1.15;
+    float temp_y = ( y - ( lv_disp_get_ver_res( NULL ) / 2 ) ) * 1.0;
+    x = temp_x + ( lv_disp_get_hor_res( NULL ) / 2 );
+    y = temp_y + ( lv_disp_get_ver_res( NULL ) / 2 );
 
     return( true );
 }

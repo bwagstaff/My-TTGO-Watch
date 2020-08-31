@@ -31,23 +31,31 @@
 
 #include "hardware/json_psram_allocator.h"
 
-update_config_t update_config;
+static update_config_t *update_config = NULL;
 
 lv_obj_t *update_setup_tile = NULL;
 lv_style_t update_setup_style;
 uint32_t update_setup_tile_num;
 
 lv_obj_t *update_check_autosync_onoff = NULL;
+lv_obj_t *update_check_url_textfield = NULL;
 
 LV_IMG_DECLARE(exit_32px);
 LV_IMG_DECLARE(setup_32px);
 
+static void update_check_url_textarea_event_cb( lv_obj_t * obj, lv_event_t event );
 static void exit_update_check_setup_event_cb( lv_obj_t * obj, lv_event_t event );
 static void update_check_autosync_onoff_event_handler( lv_obj_t * obj, lv_event_t event );
 void update_read_config( void );
 void update_save_config( void );
 
 void update_setup_tile_setup( uint32_t tile_num ) {
+
+    update_config = (update_config_t*)ps_calloc( sizeof( update_config_t ), 1 );
+    if( !update_config ) {
+      log_e("update_config calloc faild");
+      while(true);
+    }
 
     update_read_config();
 
@@ -75,7 +83,7 @@ void update_setup_tile_setup( uint32_t tile_num ) {
     lv_obj_align( exit_label, exit_btn, LV_ALIGN_OUT_RIGHT_MID, 5, 0 );
 
     lv_obj_t *update_check_autosync_cont = lv_obj_create( update_setup_tile, NULL );
-    lv_obj_set_size(update_check_autosync_cont, LV_HOR_RES_MAX , 40);
+    lv_obj_set_size(update_check_autosync_cont, lv_disp_get_hor_res( NULL ) , 40);
     lv_obj_add_style( update_check_autosync_cont, LV_OBJ_PART_MAIN, &update_setup_style  );
     lv_obj_align( update_check_autosync_cont, update_setup_tile, LV_ALIGN_IN_TOP_RIGHT, 0, 75 );
 
@@ -90,18 +98,39 @@ void update_setup_tile_setup( uint32_t tile_num ) {
     lv_label_set_text( update_check_autosync_label, "check for updates");
     lv_obj_align( update_check_autosync_label, update_check_autosync_cont, LV_ALIGN_IN_LEFT_MID, 5, 0 );
 
-    if ( update_config.autosync )
+    lv_obj_t *update_check_url_cont = lv_obj_create( update_setup_tile, NULL );
+    lv_obj_set_size(update_check_url_cont, lv_disp_get_hor_res( NULL ) , 60);
+    lv_obj_add_style( update_check_url_cont, LV_OBJ_PART_MAIN, &update_setup_style  );
+    lv_obj_align( update_check_url_cont, update_check_autosync_cont, LV_ALIGN_OUT_BOTTOM_MID, 0, 0 );
+    lv_obj_t *update_check_url_label = lv_label_create( update_check_url_cont, NULL);
+    lv_obj_add_style( update_check_url_label, LV_OBJ_PART_MAIN, &update_setup_style  );
+    lv_label_set_text( update_check_url_label, "update URL");
+    lv_obj_align( update_check_url_label, update_check_url_cont, LV_ALIGN_IN_TOP_LEFT, 5, 0 );
+    update_check_url_textfield = lv_textarea_create( update_check_url_cont, NULL);
+    lv_textarea_set_text( update_check_url_textfield, update_config->updateurl );
+    lv_textarea_set_pwd_mode( update_check_url_textfield, false);
+    lv_textarea_set_one_line( update_check_url_textfield, true);
+    lv_textarea_set_cursor_hidden( update_check_url_textfield, true);
+    lv_obj_set_width( update_check_url_textfield, lv_disp_get_hor_res( NULL ) - 10 );
+    lv_obj_align( update_check_url_textfield, update_check_url_cont, LV_ALIGN_IN_BOTTOM_MID, 0, 0 );
+    lv_obj_set_event_cb( update_check_url_textfield, update_check_url_textarea_event_cb );
+
+    if ( update_config->autosync )
         lv_switch_on( update_check_autosync_onoff, LV_ANIM_OFF);
     else
         lv_switch_off( update_check_autosync_onoff, LV_ANIM_OFF);
 
 }
 
+static void update_check_url_textarea_event_cb( lv_obj_t * obj, lv_event_t event ) {
+    if( event == LV_EVENT_CLICKED ) {
+        keyboard_set_textarea( obj );
+    }
+}
 
 static void update_check_autosync_onoff_event_handler( lv_obj_t * obj, lv_event_t event ) {
     switch (event) {
-        case (LV_EVENT_VALUE_CHANGED):      update_config.autosync = lv_switch_get_state( obj );
-                                            update_save_config();
+        case ( LV_EVENT_VALUE_CHANGED ):    update_config->autosync = lv_switch_get_state( obj );
                                             break;
     }
 }
@@ -109,6 +138,8 @@ static void update_check_autosync_onoff_event_handler( lv_obj_t * obj, lv_event_
 static void exit_update_check_setup_event_cb( lv_obj_t * obj, lv_event_t event ) {
     switch( event ) {
         case( LV_EVENT_CLICKED ):           mainbar_jump_to_tilenumber( update_setup_tile_num - 1, false );
+                                            strlcpy( update_config->updateurl , lv_textarea_get_text( update_check_url_textfield ), sizeof( update_config->updateurl ) );
+                                            update_save_config();
                                             break;
     }
 }
@@ -127,7 +158,8 @@ void update_save_config( void ) {
     else {
         SpiRamJsonDocument doc( 1000 );
 
-        doc["autosync"] = update_config.autosync;
+        doc["autosync"] = update_config->autosync;
+        doc["updateurl"] = update_config->updateurl;
 
         if ( serializeJsonPretty( doc, file ) == 0) {
             log_e("Failed to write config file");
@@ -152,7 +184,8 @@ void update_read_config( void ) {
                 log_e("update check deserializeJson() failed: %s", error.c_str() );
             }
             else {
-                update_config.autosync = doc["autosync"].as<bool>();
+                update_config->autosync = doc["autosync"].as<bool>();
+                strlcpy( update_config->updateurl, doc["updateurl"] | FIRMWARE_UPDATE_URL, sizeof( update_config->updateurl ) );
             }        
             doc.clear();
         }
@@ -182,5 +215,9 @@ void update_read_config( void ) {
 }
 
 bool update_setup_get_autosync( void ) {
-    return( update_config.autosync );
+    return( update_config->autosync );
+}
+
+char* update_setup_get_url( void ) {
+    return( update_config->updateurl );
 }
