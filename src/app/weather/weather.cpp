@@ -77,6 +77,7 @@ void weather_app_setup( void ) {
 
     weather_app_cont = app_tile_register_app( "weather");
     lv_obj_t *weather_app_icon = lv_imgbtn_create( weather_app_cont, NULL );
+    mainbar_add_slide_element(weather_app_icon);
     lv_imgbtn_set_src( weather_app_icon, LV_BTN_STATE_RELEASED, &owm_01d_64px);
     lv_imgbtn_set_src( weather_app_icon, LV_BTN_STATE_PRESSED, &owm_01d_64px);
     lv_imgbtn_set_src( weather_app_icon, LV_BTN_STATE_CHECKED_RELEASED, &owm_01d_64px);
@@ -89,6 +90,7 @@ void weather_app_setup( void ) {
     // create widget weather condition icon and temperature label
     weather_widget_cont = main_tile_register_widget();
     weather_widget_condition_img = lv_imgbtn_create( weather_widget_cont, NULL );
+    mainbar_add_slide_element(weather_widget_condition_img);
     lv_imgbtn_set_src( weather_widget_condition_img, LV_BTN_STATE_RELEASED, &owm_01d_64px);
     lv_imgbtn_set_src( weather_widget_condition_img, LV_BTN_STATE_PRESSED, &owm_01d_64px);
     lv_imgbtn_set_src( weather_widget_condition_img, LV_BTN_STATE_CHECKED_RELEASED, &owm_01d_64px);
@@ -124,6 +126,8 @@ void weather_app_setup( void ) {
 }
 
 void weather_widget_wifictl_event_cb( EventBits_t event, char* msg ) {
+    log_i("weather widget wifictl event: %04x", event );
+
     switch( event ) {
         case WIFICTL_CONNECT:       if ( weather_config.autosync ) {
                                         weather_widget_sync_request();
@@ -173,7 +177,7 @@ weather_config_t *weather_get_config( void ) {
 }
 
 void weather_widget_sync_Task( void * pvParameters ) {
-    log_i("start weather widget task");
+    log_i("start weather widget task, heap: %d", ESP.getFreeHeap() );
 
     vTaskDelay( 250 );
 
@@ -207,6 +211,7 @@ void weather_widget_sync_Task( void * pvParameters ) {
         lv_obj_invalidate( lv_scr_act() );
     }
     xEventGroupClearBits( weather_widget_event_handle, WEATHER_WIDGET_SYNC_REQUEST );
+    log_i("finish weather widget task, heap: %d", ESP.getFreeHeap() );
     vTaskDelete( NULL );
 }
 
@@ -232,6 +237,7 @@ void weather_save_config( void ) {
         doc["lon"] = weather_config.lon;
         doc["autosync"] = weather_config.autosync;
         doc["showWind"] = weather_config.showWind;
+        doc["imperial"] = weather_config.imperial;
 
         if ( serializeJsonPretty( doc, file ) == 0) {
             log_e("Failed to write config file");
@@ -264,6 +270,7 @@ void weather_load_config( void ) {
                 strlcpy( weather_config.lon, doc["lon"], sizeof( weather_config.lon ) );
                 weather_config.autosync = doc["autosync"].as<bool>();
                 weather_config.showWind = doc["showWind"].as<bool>();
+                weather_config.imperial = doc["imperial"].as<bool>();
             }        
             doc.clear();
         }

@@ -32,7 +32,7 @@
     #define SETUP_ICON_X_SIZE         64
     #define SETUP_ICON_Y_SIZE         64
     #define SETUP_ICON_X_CLEARENCE    8
-    #define SETUP_ICON_Y_CLEARENCE    16
+    #define SETUP_ICON_Y_CLEARENCE    36
     #define SETUP_LABEL_X_SIZE        SETUP_ICON_X_SIZE + SETUP_ICON_X_CLEARENCE
     #define SETUP_LABEL_Y_SIZE        SETUP_ICON_Y_CLEARENCE / 2
 
@@ -54,7 +54,7 @@
     /*
      * @brief register an setup icon an the setup tile
      * 
-     * @return  lv_obj_t    icon container, here you can set your own icon with imgbtn
+     * @return  pointer to lv_obj_t icon container, here you can set your own icon with imgbtn
      */
     lv_obj_t *setup_tile_register_setup( void );
     /*

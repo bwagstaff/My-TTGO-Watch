@@ -37,7 +37,7 @@ timesync_config_t timesync_config;
 
 void timesync_wifictl_event_cb( EventBits_t event, char* msg );
 
-void timesync_setup( TTGOClass *ttgo ) {
+void timesync_setup( void ) {
 
     timesync_read_config();
     time_event_handle = xEventGroupCreate();
@@ -46,19 +46,24 @@ void timesync_setup( TTGOClass *ttgo ) {
 }
 
 void timesync_wifictl_event_cb( EventBits_t event, char* msg ) {
-    if ( timesync_config.timesync ) {
-        if ( xEventGroupGetBits( time_event_handle ) & TIME_SYNC_REQUEST ) {
-            return;
-        }
-        else {
-            xEventGroupSetBits( time_event_handle, TIME_SYNC_REQUEST );
-            xTaskCreate(  timesync_Task,      /* Function to implement the task */
-                        "timesync Task",    /* Name of the task */
-                        2000,              /* Stack size in words */
-                        NULL,               /* Task input parameter */
-                        1,                  /* Priority of the task */
-                        &_timesync_Task );  /* Task handle. */
-        }
+    log_i("timesync wifictl event: %04x", event );
+
+    switch ( event ) {
+        case WIFICTL_CONNECT:       if ( timesync_config.timesync ) {
+                                        if ( xEventGroupGetBits( time_event_handle ) & TIME_SYNC_REQUEST ) {
+                                            return;
+                                        }
+                                        else {
+                                            xEventGroupSetBits( time_event_handle, TIME_SYNC_REQUEST );
+                                            xTaskCreate(  timesync_Task,      /* Function to implement the task */
+                                                        "timesync Task",    /* Name of the task */
+                                                        2000,              /* Stack size in words */
+                                                        NULL,               /* Task input parameter */
+                                                        1,                  /* Priority of the task */
+                                                        &_timesync_Task );  /* Task handle. */
+                                        }
+                                    }
+                                    break;
     }
 }
 
@@ -105,7 +110,7 @@ void timesync_read_config( void ) {
             else {
                 timesync_config.daylightsave = doc["daylightsave"].as<bool>();
                 timesync_config.timesync = doc["timesync"].as<bool>();
-                timesync_config.timezone = doc["timezone"].as<uint32_t>();
+                timesync_config.timezone = doc["timezone"].as<int32_t>();
             }        
             doc.clear();
         }
@@ -172,7 +177,7 @@ void timesyncToRTC( void ) {
 }
 
 void timesync_Task( void * pvParameters ) {
-  log_i("start time sync task");
+  log_i("start time sync task, heap: %d", ESP.getFreeHeap() );
 
   if ( xEventGroupGetBits( time_event_handle ) & TIME_SYNC_REQUEST ) {   
     struct tm info;
@@ -190,5 +195,6 @@ void timesync_Task( void * pvParameters ) {
     }
   }
   xEventGroupClearBits( time_event_handle, TIME_SYNC_REQUEST );
+  log_i("finish time sync task, heap: %d", ESP.getFreeHeap() );
   vTaskDelete( NULL );
 }

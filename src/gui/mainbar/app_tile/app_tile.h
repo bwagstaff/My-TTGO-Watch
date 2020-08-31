@@ -26,12 +26,13 @@
 
     #define MAX_APPS_ICON_HORZ      3
     #define MAX_APPS_ICON_VERT      2
-    #define MAX_APPS_ICON           ( MAX_APPS_ICON_HORZ * MAX_APPS_ICON_VERT )
+    #define MAX_APPS_TILES          2
+    #define MAX_APPS_ICON           ( MAX_APPS_ICON_HORZ * MAX_APPS_ICON_VERT * MAX_APPS_TILES )
 
     #define APP_ICON_X_SIZE         64
     #define APP_ICON_Y_SIZE         64
     #define APP_ICON_X_CLEARENCE    8
-    #define APP_ICON_Y_CLEARENCE    20
+    #define APP_ICON_Y_CLEARENCE    36
     #define APP_LABEL_X_SIZE        APP_ICON_X_SIZE + APP_ICON_X_CLEARENCE
     #define APP_LABEL_Y_SIZE        APP_ICON_Y_CLEARENCE / 2
 
@@ -41,13 +42,10 @@
     typedef struct {
         lv_obj_t *app;
         lv_obj_t *label;
-        lv_obj_t *icon_cont;
-        lv_obj_t *icon;
-        lv_obj_t *icon_indicator;
         lv_coord_t x;
         lv_coord_t y;
         bool active;
-    } lv_app_entry_t;
+    } lv_app_icon_t;
 
     /*
      * @brief setup the app tile
@@ -58,7 +56,7 @@
      * 
      * @param   appname     app name
      * 
-     * @return  lv_obj_t    icon container, here you can set your own icon with imgbtn
+     * @return  pointer to lv_obj_t icon container, here you can set your own icon with imgbtn
      */
     lv_obj_t *app_tile_register_app( const char* appname );
     /*

@@ -22,10 +22,10 @@
 #include "config.h"
 #include <TTGO.h>
 #include <soc/rtc.h>
-#include <WiFi.h>
 #include <esp_wifi.h>
 #include <time.h>
 #include "driver/adc.h"
+#include "esp_pm.h"
 
 #include "pmu.h"
 #include "bma.h"
@@ -36,7 +36,7 @@
 #include "motor.h"
 #include "touch.h"
 #include "display.h"
-#include "sound.h"
+#include "rtcctl.h"
 
 #include "gui/mainbar/mainbar.h"
 
@@ -46,33 +46,37 @@ portMUX_TYPE powermgmMux = portMUX_INITIALIZER_UNLOCKED;
 /*
  *
  */
-void powermgm_setup( TTGOClass *ttgo ) {
+void powermgm_setup( void ) {
 
     powermgm_status = xEventGroupCreate();
 
-    pmu_setup( ttgo );
-    bma_setup( ttgo );
+    pmu_setup();
+    bma_setup();
     wifictl_setup();
     blectl_read_config();
-    timesync_setup( ttgo );
-    touch_setup( ttgo );
-    sound_setup();
+    timesync_setup();
+    touch_setup();
+    rtcctl_setup();
 }
 
 /*
  *
  */
-void powermgm_loop( TTGOClass *ttgo ) {
+void powermgm_loop( void ) {
+
+    TTGOClass *ttgo = TTGOClass::getWatch();
 
     // check if a button or doubleclick was release
-    if( powermgm_get_event( POWERMGM_PMU_BUTTON | POWERMGM_BMA_DOUBLECLICK ) ) {
+    if( powermgm_get_event( POWERMGM_PMU_BUTTON | POWERMGM_BMA_DOUBLECLICK | POWERMGM_BMA_TILT | POWERMGM_RTC_ALARM ) ) {
         if ( powermgm_get_event( POWERMGM_STANDBY ) || powermgm_get_event( POWERMGM_SILENCE_WAKEUP ) ) {
             powermgm_set_event( POWERMGM_WAKEUP_REQUEST );
         }
         else {
-            powermgm_set_event( POWERMGM_STANDBY_REQUEST );
+            if ( powermgm_get_event( POWERMGM_PMU_BUTTON | POWERMGM_BMA_DOUBLECLICK ) ) {
+                powermgm_set_event( POWERMGM_STANDBY_REQUEST );
+            }
         }
-        powermgm_clear_event( POWERMGM_PMU_BUTTON | POWERMGM_BMA_DOUBLECLICK );
+        powermgm_clear_event( POWERMGM_PMU_BUTTON | POWERMGM_BMA_DOUBLECLICK  | POWERMGM_BMA_TILT | POWERMGM_RTC_ALARM );
     }
 
     if ( powermgm_get_event( POWERMGM_WAKEUP_REQUEST ) && powermgm_get_event( POWERMGM_WAKEUP ) ) {
@@ -97,8 +101,9 @@ void powermgm_loop( TTGOClass *ttgo ) {
         wifictl_wakeup();
         blectl_wakeup();
 
-        log_i("Free heap: %d\r\n", ESP.getFreeHeap());
-        log_i("Free PSRAM heap: %d\r\n", ESP.getFreePsram());
+        log_i("Free heap: %d", ESP.getFreeHeap());
+        log_i("Free PSRAM heap: %d", ESP.getFreePsram());
+        log_i("uptime: %d", millis() / 1000 );
 
         ttgo->startLvglTick();
         lv_disp_trig_activity(NULL);
@@ -119,9 +124,10 @@ void powermgm_loop( TTGOClass *ttgo ) {
 
         ttgo->stopLvglTick();
 
-        log_i("Free heap: %d\r\n", ESP.getFreeHeap());
-        log_i("Free PSRAM heap: %d\r\n", ESP.getFreePsram());
-        
+        log_i("Free heap: %d", ESP.getFreeHeap());
+        log_i("Free PSRAM heap: %d", ESP.getFreePsram());
+        log_i("uptime: %d", millis() / 1000 );
+
         display_standby();
 
         timesyncToRTC();
@@ -142,6 +148,7 @@ void powermgm_loop( TTGOClass *ttgo ) {
             setCpuFrequencyMhz( 10 );
             gpio_wakeup_enable ( (gpio_num_t)AXP202_INT, GPIO_INTR_LOW_LEVEL );
             gpio_wakeup_enable ( (gpio_num_t)BMA423_INT1, GPIO_INTR_HIGH_LEVEL );
+            gpio_wakeup_enable ( (gpio_num_t)RTC_INT, GPIO_INTR_LOW_LEVEL );
             esp_sleep_enable_gpio_wakeup ();
             esp_light_sleep_start();
             // from here, the consumption is round about 2.5mA
@@ -156,9 +163,17 @@ void powermgm_loop( TTGOClass *ttgo ) {
     }
     powermgm_clear_event( POWERMGM_SILENCE_WAKEUP_REQUEST | POWERMGM_WAKEUP_REQUEST | POWERMGM_STANDBY_REQUEST );
 
-    pmu_loop( ttgo );
-    bma_loop( ttgo );
-    display_loop( ttgo );
+    if ( powermgm_get_event( POWERMGM_STANDBY ) ) {
+        vTaskDelay( 100 );
+        pmu_loop();
+        bma_loop();
+    }
+    else {
+        pmu_loop();
+        bma_loop();
+        display_loop();
+        rtcctl_loop();
+    }
 }
 
 /*

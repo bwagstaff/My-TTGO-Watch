@@ -24,7 +24,7 @@
 
     #include "config.h"
 
-    #define SCREENSHOT_FILE_NAME    "/screen.565"
+    #define SCREENSHOT_FILE_NAME    "/screen.data"
 
     /*
      * @brief setup screenshot
@@ -35,10 +35,11 @@
      */
     void screenshot_take( void );
     /*
-     * @brief store a screenshoot to spiffs
+     * @brief store a screenshoot from psram to spiffs
      */
     void screenshot_save( void );
 
+/*
     struct PNG_IMAGE {
         uint8_t     png[ 8 ];
         uint32_t    IHDR_len;
@@ -59,5 +60,6 @@
         uint8_t     IEND[ 4 ];
         uint32_t    IEND_crc;
     } __attribute__((packed));
+*/
 
 #endif // _SCREENSHOT_H

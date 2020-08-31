@@ -41,7 +41,8 @@ void IRAM_ATTR bma_irq( void );
 /*
  *
  */
-void bma_setup( TTGOClass *ttgo ) {
+void bma_setup( void ) {
+    TTGOClass *ttgo = TTGOClass::getWatch();
 
     bma_event_handle = xEventGroupCreate();
 
@@ -101,6 +102,7 @@ void bma_reload_settings( void ) {
 
     ttgo->bma->enableStepCountInterrupt( bma_config[ BMA_STEPCOUNTER ].enable );
     ttgo->bma->enableWakeupInterrupt( bma_config[ BMA_DOUBLECLICK ].enable );
+    ttgo->bma->enableTiltInterrupt( bma_config[ BMA_TILT ].enable );
 }
 
 /*
@@ -120,7 +122,8 @@ void IRAM_ATTR  bma_irq( void ) {
 /*
  * loop routine for handling IRQ in main loop
  */
-void bma_loop( TTGOClass *ttgo ) {
+void bma_loop( void ) {
+    TTGOClass *ttgo = TTGOClass::getWatch();
     /*
      * handle IRQ event
      */
@@ -128,6 +131,11 @@ void bma_loop( TTGOClass *ttgo ) {
       while( !ttgo->bma->readInterrupt() );
         if ( ttgo->bma->isDoubleClick() ) {
             powermgm_set_event( POWERMGM_BMA_DOUBLECLICK );
+            xEventGroupClearBitsFromISR( bma_event_handle, BMA_EVENT_INT );
+            return;
+        }
+        if ( ttgo->bma->isTilt() ) {
+            powermgm_set_event( POWERMGM_BMA_TILT );
             xEventGroupClearBitsFromISR( bma_event_handle, BMA_EVENT_INT );
             return;
         }
@@ -159,6 +167,7 @@ void bma_save_config( void ) {
 
         doc["stepcounter"] = bma_config[ BMA_STEPCOUNTER ].enable;
         doc["doubleclick"] = bma_config[ BMA_DOUBLECLICK ].enable;
+        doc["tilt"] = bma_config[ BMA_TILT ].enable;
 
         if ( serializeJsonPretty( doc, file ) == 0) {
             log_e("Failed to write config file");
@@ -186,8 +195,9 @@ void bma_read_config( void ) {
                 log_e("update check deserializeJson() failed: %s", error.c_str() );
             }
             else {
-                bma_config[ BMA_STEPCOUNTER ].enable = doc["stepcounter"].as<bool>();
-                bma_config[ BMA_DOUBLECLICK ].enable = doc["doubleclick"].as<bool>();
+                bma_config[ BMA_STEPCOUNTER ].enable = doc["stepcounter"].as<bool>() | true;
+                bma_config[ BMA_DOUBLECLICK ].enable = doc["doubleclick"].as<bool>() | true;
+                bma_config[ BMA_TILT ].enable = doc["tilt"].as<bool>() | false;
             }        
             doc.clear();
         }
@@ -234,5 +244,46 @@ void bma_set_config( int config, bool enable ) {
         bma_config[ config ].enable = enable;
         bma_save_config();
         bma_reload_settings();
+    }
+}
+
+void bma_set_rotate_tilt( uint32_t rotation ) {
+    struct bma423_axes_remap remap_data;
+
+    TTGOClass *ttgo = TTGOClass::getWatch();
+
+    switch( rotation / 90 ) {
+        case 0:     remap_data.x_axis = 0;
+                    remap_data.x_axis_sign = 1;
+                    remap_data.y_axis = 1;
+                    remap_data.y_axis_sign = 1;
+                    remap_data.z_axis  = 2;
+                    remap_data.z_axis_sign  = 1;
+                    ttgo->bma->set_remap_axes(&remap_data);
+                    break;
+        case 1:     remap_data.x_axis = 1;
+                    remap_data.x_axis_sign = 1;
+                    remap_data.y_axis = 0;
+                    remap_data.y_axis_sign = 0;
+                    remap_data.z_axis  = 2;
+                    remap_data.z_axis_sign  = 1;
+                    ttgo->bma->set_remap_axes(&remap_data);
+                    break;
+        case 2:     remap_data.x_axis = 0;
+                    remap_data.x_axis_sign = 1;
+                    remap_data.y_axis = 1;
+                    remap_data.y_axis_sign = 0;
+                    remap_data.z_axis  = 2;
+                    remap_data.z_axis_sign  = 1;
+                    ttgo->bma->set_remap_axes(&remap_data);
+                    break;
+        case 3:     remap_data.x_axis = 1;
+                    remap_data.x_axis_sign = 1;
+                    remap_data.y_axis = 0;
+                    remap_data.y_axis_sign = 1;
+                    remap_data.z_axis  = 2;
+                    remap_data.z_axis_sign  = 1;
+                    ttgo->bma->set_remap_axes(&remap_data);
+                    break;
     }
 }
