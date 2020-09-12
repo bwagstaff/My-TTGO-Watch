@@ -23,6 +23,7 @@
     #define _APP_TILE_H
 
     #include <TTGO.h>
+    #include "gui/icon.h"
 
     #define MAX_APPS_ICON_HORZ      3
     #define MAX_APPS_ICON_VERT      2
@@ -39,14 +40,6 @@
     #define APP_FIRST_X_POS         ( 240 - ( APP_ICON_X_SIZE * MAX_APPS_ICON_HORZ + APP_ICON_X_CLEARENCE * ( MAX_APPS_ICON_HORZ - 1 ) ) ) / 2
     #define APP_FIRST_Y_POS         ( 240 - ( APP_ICON_Y_SIZE * MAX_APPS_ICON_VERT + APP_ICON_Y_CLEARENCE * ( MAX_APPS_ICON_VERT - 1 ) ) ) / 2
 
-    typedef struct {
-        lv_obj_t *app;
-        lv_obj_t *label;
-        lv_coord_t x;
-        lv_coord_t y;
-        bool active;
-    } lv_app_icon_t;
-
     /*
      * @brief setup the app tile
      */
@@ -59,6 +52,12 @@
      * @return  pointer to lv_obj_t icon container, here you can set your own icon with imgbtn
      */
     lv_obj_t *app_tile_register_app( const char* appname );
+    /*
+     * @brief   get the an free app icon stucture
+     * 
+     * @return  pointer to the free lv_app_icon_t structure
+     */
+    icon_t *app_tile_get_free_app_icon( void );
     /*
      * @brief get the tile number for the app tile
      * 

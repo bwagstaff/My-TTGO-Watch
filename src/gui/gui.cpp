@@ -32,7 +32,7 @@
 #include "mainbar/main_tile/main_tile.h"
 #include "mainbar/app_tile/app_tile.h"
 #include "mainbar/note_tile/note_tile.h"
-#include "mainbar/setup_tile/setup.h"
+#include "mainbar/setup_tile/setup_tile.h"
 
 #include "mainbar/setup_tile/battery_settings/battery_settings.h"
 #include "mainbar/setup_tile/display_settings/display_settings.h"
@@ -41,16 +41,16 @@
 #include "mainbar/setup_tile/update/update.h"
 #include "mainbar/setup_tile/wlan_settings/wlan_settings.h"
 #include "mainbar/setup_tile/bluetooth_settings/bluetooth_settings.h"
+#include "mainbar/setup_tile/sound_settings/sound_settings.h"
+
+#include "mainbar/setup_tile/utilities/utilities.h"
 
 #include "hardware/powermgm.h"
 #include "hardware/display.h"
 
-LV_IMG_DECLARE(bg2)
+LV_IMG_DECLARE(bg2);
 
-/**
- * Create a demo application
- */
-void gui_setup(void)
+void gui_setup( void )
 {
     //Create wallpaper
     lv_obj_t *img_bin = lv_img_create( lv_scr_act() , NULL );
@@ -74,6 +74,8 @@ void gui_setup(void)
     bluetooth_settings_tile_setup();
     time_settings_tile_setup();
     update_tile_setup();
+    utilities_tile_setup();
+    sound_settings_tile_setup();
 
     statusbar_setup();
     lv_disp_trig_activity( NULL );
@@ -83,9 +85,6 @@ void gui_setup(void)
     return;
 }
 
-/*
- *
- */
 void gui_loop( void ) {
     // if we run in silence mode    
     if ( powermgm_get_event( POWERMGM_SILENCE_WAKEUP ) ) {
