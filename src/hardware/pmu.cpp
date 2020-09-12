@@ -9,16 +9,12 @@
 #include "motor.h"
 #include "blectl.h"
 
-
 #include "gui/statusbar.h"
 
 EventGroupHandle_t pmu_event_handle = NULL;
 void IRAM_ATTR pmu_irq( void );
 pmu_config_t pmu_config;
 
-/*
- * init the pmu: AXP202 
- */
 void pmu_setup( void ) {
     pmu_event_handle = xEventGroupCreate();
 
@@ -62,9 +58,6 @@ void pmu_setup( void ) {
     attachInterrupt( AXP202_INT, &pmu_irq, FALLING );
 }
 
-/*
- * IRQ routine AXP202
- */
 void IRAM_ATTR  pmu_irq( void ) {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     /*
@@ -121,9 +114,7 @@ void pmu_wakeup( void ) {
     ttgo->power->setPowerOutPut( AXP202_LDO3, AXP202_ON );
     ttgo->power->setPowerOutPut( AXP202_LDO2, AXP202_ON );
 }
-/*
- *
- */
+
 void pmu_save_config( void ) {
     if ( SPIFFS.exists( PMU_CONFIG_FILE ) ) {
         SPIFFS.remove( PMU_CONFIG_FILE );
@@ -158,9 +149,6 @@ void pmu_save_config( void ) {
     file.close();
 }
 
-/*
- *
- */
 void pmu_read_config( void ) {
     if ( SPIFFS.exists( PMU_JSON_CONFIG_FILE ) ) {        
         fs::File file = SPIFFS.open( PMU_JSON_CONFIG_FILE, FILE_READ );
@@ -177,16 +165,16 @@ void pmu_read_config( void ) {
             }
             else {
                 pmu_config.silence_wakeup = doc["silence_wakeup"] | false;
-                pmu_config.silence_wakeup_time = doc["compute_percent"] | 60;
-                pmu_config.silence_wakeup_time_vbplug = doc["compute_percent"] | 3;
+                pmu_config.silence_wakeup_time = doc["silence_wakeup_time"] | SILENCEWAKEUPTIME;
+                pmu_config.silence_wakeup_time_vbplug = doc["silence_wakeup_time_vbplug"] | SILENCEWAKEUPTIME_PLUG;
                 pmu_config.experimental_power_save = doc["experimental_power_save"] | false;
                 pmu_config.compute_percent = doc["compute_percent"] | false;
                 pmu_config.high_charging_target_voltage = doc["high_charging_target_voltage"] | false;
                 pmu_config.designed_battery_cap = doc["designed_battery_cap"] | 300;
-                pmu_config.normal_voltage = doc["normal_voltage"] | 3300;
-                pmu_config.normal_power_save_voltage = doc["normal_power_save_voltage"] | 3000;
-                pmu_config.experimental_normal_voltage = doc["experimental_normal_voltage"] | 3000;
-                pmu_config.experimental_power_save_voltage = doc["experimental_power_save_voltage"] | 2700;
+                pmu_config.normal_voltage = doc["normal_voltage"] | NORMALVOLTAGE;
+                pmu_config.normal_power_save_voltage = doc["normal_power_save_voltage"] | NORMALPOWERSAVEVOLTAGE;
+                pmu_config.experimental_normal_voltage = doc["experimental_normal_voltage"] | EXPERIMENTALNORMALVOLTAGE;
+                pmu_config.experimental_power_save_voltage = doc["experimental_power_save_voltage"] | EXPERIMENTALPOWERSAVEVOLTAGE;
             }        
             doc.clear();
         }
@@ -246,9 +234,6 @@ void pmu_set_experimental_power_save( bool value ) {
     pmu_save_config();
 }
 
-/*
- * loop routine for handling IRQ in main loop
- */
 void pmu_loop( void ) {
     static uint64_t nextmillis = 0;
     bool updatetrigger = false;

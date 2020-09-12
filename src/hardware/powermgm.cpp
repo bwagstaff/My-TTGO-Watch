@@ -37,15 +37,18 @@
 #include "touch.h"
 #include "display.h"
 #include "rtcctl.h"
+#include "sound.h"
 
 #include "gui/mainbar/mainbar.h"
 
 EventGroupHandle_t powermgm_status = NULL;
 portMUX_TYPE powermgmMux = portMUX_INITIALIZER_UNLOCKED;
 
-/*
- *
- */
+powermgm_event_cb_t *powermgm_event_cb_table = NULL;
+uint32_t powermgm_event_cb_entrys = 0;
+
+void powermgm_send_event_cb( EventBits_t event );
+
 void powermgm_setup( void ) {
 
     powermgm_status = xEventGroupCreate();
@@ -53,15 +56,12 @@ void powermgm_setup( void ) {
     pmu_setup();
     bma_setup();
     wifictl_setup();
-    blectl_read_config();
     timesync_setup();
     touch_setup();
     rtcctl_setup();
+    blectl_read_config();
 }
 
-/*
- *
- */
 void powermgm_loop( void ) {
 
     TTGOClass *ttgo = TTGOClass::getWatch();
@@ -75,6 +75,9 @@ void powermgm_loop( void ) {
             if ( powermgm_get_event( POWERMGM_PMU_BUTTON | POWERMGM_BMA_DOUBLECLICK ) ) {
                 powermgm_set_event( POWERMGM_STANDBY_REQUEST );
             }
+        }
+        if ( powermgm_get_event( POWERMGM_RTC_ALARM ) ) {
+            powermgm_send_event_cb( POWERMGM_RTC_ALARM );
         }
         powermgm_clear_event( POWERMGM_PMU_BUTTON | POWERMGM_BMA_DOUBLECLICK  | POWERMGM_BMA_TILT | POWERMGM_RTC_ALARM );
     }
@@ -90,10 +93,18 @@ void powermgm_loop( void ) {
 
         log_i("go wakeup");
 
-        setCpuFrequencyMhz(240);
+        //Network transfer times are likely a greater time consumer than actual computational time
+        if (powermgm_get_event(POWERMGM_SILENCE_WAKEUP_REQUEST)){
+            powermgm_send_event_cb( POWERMGM_SILENCE_WAKEUP );
+            setCpuFrequencyMhz(80);
+        }else{
+            powermgm_send_event_cb( POWERMGM_WAKEUP );
+            setCpuFrequencyMhz(240);
+        }
 
         pmu_wakeup();
         bma_wakeup();
+        sound_wakeup();
         display_wakeup( powermgm_get_event( POWERMGM_SILENCE_WAKEUP_REQUEST )?true:false );
 
         timesyncToSystem();
@@ -116,7 +127,12 @@ void powermgm_loop( void ) {
         }
     }        
     else if( powermgm_get_event( POWERMGM_STANDBY_REQUEST ) ) {
+        
+        //Save info to avoid buzz when standby after silent wake
+        bool noBuzz = powermgm_get_event( POWERMGM_SILENCE_WAKEUP | POWERMGM_SILENCE_WAKEUP_REQUEST);
+        
         powermgm_clear_event( POWERMGM_STANDBY | POWERMGM_SILENCE_WAKEUP | POWERMGM_WAKEUP );
+        powermgm_send_event_cb( POWERMGM_STANDBY );
 
         if ( !display_get_block_return_maintile() ) {
             mainbar_jump_to_maintile( LV_ANIM_OFF );
@@ -134,6 +150,7 @@ void powermgm_loop( void ) {
 
         bma_standby();
         pmu_standby();
+        sound_standby();
         wifictl_standby();
         blectl_standby();
 
@@ -142,10 +159,10 @@ void powermgm_loop( void ) {
         powermgm_set_event( POWERMGM_STANDBY );
 
         if ( !blectl_get_enable_on_standby() ) {
-            motor_vibe(3);
+            if (!noBuzz) motor_vibe(3);  //Only buzz if a non silent wake was performed
             delay(50);
             log_i("go standby");
-            setCpuFrequencyMhz( 10 );
+            setCpuFrequencyMhz( 80 );
             gpio_wakeup_enable ( (gpio_num_t)AXP202_INT, GPIO_INTR_LOW_LEVEL );
             gpio_wakeup_enable ( (gpio_num_t)BMA423_INT1, GPIO_INTR_HIGH_LEVEL );
             gpio_wakeup_enable ( (gpio_num_t)RTC_INT, GPIO_INTR_LOW_LEVEL );
@@ -176,30 +193,61 @@ void powermgm_loop( void ) {
     }
 }
 
-/*
- *
- */
 void powermgm_set_event( EventBits_t bits ) {
     portENTER_CRITICAL(&powermgmMux);
     xEventGroupSetBits( powermgm_status, bits );
     portEXIT_CRITICAL(&powermgmMux);
 }
 
-/*
- *
- */
 void powermgm_clear_event( EventBits_t bits ) {
     portENTER_CRITICAL(&powermgmMux);
     xEventGroupClearBits( powermgm_status, bits );
     portEXIT_CRITICAL(&powermgmMux);
 }
 
-/*
- *
- */
 EventBits_t powermgm_get_event( EventBits_t bits ) {
     portENTER_CRITICAL(&powermgmMux);
     EventBits_t temp = xEventGroupGetBits( powermgm_status ) & bits;
     portEXIT_CRITICAL(&powermgmMux);
     return( temp );
+}
+
+void powermgm_register_cb( EventBits_t event, POWERMGM_CALLBACK_FUNC powermgm_event_cb ){
+    powermgm_event_cb_entrys++;
+
+    if ( powermgm_event_cb_table == NULL ) {
+        powermgm_event_cb_table = ( powermgm_event_cb_t * )ps_malloc( sizeof( powermgm_event_cb_t ) * powermgm_event_cb_entrys );
+        if ( powermgm_event_cb_table == NULL ) {
+            log_e("powermgm_event_cb_table malloc faild");
+            while(true);
+        }
+    }
+    else {
+        powermgm_event_cb_t *new_powermgm_event_cb_table = NULL;
+
+        new_powermgm_event_cb_table = ( powermgm_event_cb_t * )ps_realloc( powermgm_event_cb_table, sizeof( powermgm_event_cb_t ) * powermgm_event_cb_entrys );
+        if ( new_powermgm_event_cb_table == NULL ) {
+            log_e("powermgm_event_cb_table realloc faild");
+            while(true);
+        }
+        powermgm_event_cb_table = new_powermgm_event_cb_table;
+    }
+
+    powermgm_event_cb_table[ powermgm_event_cb_entrys - 1 ].event = event;
+    powermgm_event_cb_table[ powermgm_event_cb_entrys - 1 ].event_cb = powermgm_event_cb;
+    log_i("register powermgm_event_cb success (%p)", powermgm_event_cb_table[ powermgm_event_cb_entrys - 1 ].event_cb );
+}
+
+void powermgm_send_event_cb( EventBits_t event ) {
+    if ( powermgm_event_cb_entrys == 0 ) {
+      return;
+    }
+      
+    for ( int entry = 0 ; entry < powermgm_event_cb_entrys ; entry++ ) {
+        yield();
+        if ( event & powermgm_event_cb_table[ entry ].event ) {
+            log_i("call powermgm_event_cb (%p)", powermgm_event_cb_table[ entry ].event_cb );
+            powermgm_event_cb_table[ entry ].event_cb( event );
+        }
+    }
 }

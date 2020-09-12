@@ -1,6 +1,15 @@
+<p align="center">
+<img src="https://img.shields.io/github/last-commit/sharandac/My-TTGO-Watch.svg?style=for-the-badge" />
+&nbsp;
+<img src="https://img.shields.io/github/license/sharandac/My-TTGO-Watch.svg?style=for-the-badge" />
+&nbsp;
+<a href="https://www.buymeacoffee.com/sharandac" target="_blank"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-%E2%82%AC5-orange?style=for-the-badge&logo=buy-me-a-coffee" /></a>
+</p>
+<hr/>
+
 # My-TTGO-Watch
 
-A smartwatch based on ESP32 from LlyGo. Currently under development.
+A smartwatch based on ESP32 from LilyGo. Currently under development.
 
 # Install
 
@@ -15,6 +24,7 @@ or simple press "build and upload" in platformIO.
 # known issues
 
 * the webserver crashes the ESP32 really often
+* sound and webserver will not work at the same time ( cause cache crashes )
 * the battery indicator is not accurate, rather a problem with the power management unit ( axp202 )
 * from time to time the esp32 crashes accidentally
 * and some other small things
@@ -42,6 +52,24 @@ to move your json into PSRAM, here is enough RAM for all the crazy stuff you wil
 as often as possible.
 And one very important thing: Do not talk directly to the hardware!
 
+## Sound
+To play sounds from the inbuild speakers use `hardware/sound.h`:
+
+```
+#include "hardware/sound.h"
+[...]
+// MP3 from SPIFFS:
+// void sound_play_spiffs_mp3( const char *filename );
+// example:
+sound_play_spiffs_mp3( "/sound.mp3" )
+
+// or WAV from PROGMEM via
+//void sound_play_progmem_wav( const void *data, uint32_t len );
+
+```
+
+There is a configuration tile to enable/disable all sound output and set the global volume.
+
 # how to make a screenshot
 The firmware has an integrated webserver. Over this a screenshot can be triggered. The image has the format RGB565 and can be read with gimp. From bash it look like this
 ```bash
@@ -61,3 +89,38 @@ wget x.x.x.x/shot ; wget x.x.x.x/screen.565
 ![screenshot](https://github.com/sharandac/My-TTGO-Watch/blob/master/images/screen9.png)
 ![screenshot](https://github.com/sharandac/My-TTGO-Watch/blob/master/images/screen10.png)
 ![screenshot](https://github.com/sharandac/My-TTGO-Watch/blob/master/images/screen11.png)
+
+
+# Contributors
+
+Special thanks to the following people for their help:
+
+[5tormChild](https://github.com/5tormChild)<br>
+[bwagstaff](https://github.com/bwagstaff)<br>
+[chrismcna](https://github.com/chrismcna)<br>
+[datacute](https://github.com/datacute)<br>
+[jakub-vesely](https://github.com/jakub-vesely)<br>
+[joshvito](https://github.com/joshvito)<br>
+[JoanMCD](https://github.com/JoanMCD)<br>
+[NorthernDIY](https://github.com/NorthernDIY)<br>
+[rnisthal](https://github.com/rnisthal)<br>
+[paulstueber](https://github.com/paulstueber)<br>
+
+and the following projects:
+
+[ArduinoJson](https://github.com/bblanchon/ArduinoJson)<br>
+[AsyncTCP](https://github.com/me-no-dev/AsyncTCP)<br>
+[ESP32SSDP](https://github.com/luc-github/ESP32SSDP)<br>
+[ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer)<br>
+[LVGL](https://github.com/lvgl)<br>
+[TFT_eSPI](https://github.com/Bodmer/TFT_eSPI)<br>
+[TTGO_TWatch_Library](https://github.com/Xinyuan-LilyGO/TTGO_TWatch_Library)<br>
+[ESP8266Audio](https://github.com/earlephilhower/ESP8266Audio)<br>
+[pubsubclient](https://github.com/knolleary/pubsubclient)<br>
+
+Every Contribution to this repository is highly welcome! Don't fear to create pull requests which enhance or fix the project, you are going to help everybody.
+<p>
+If you want to donate to the author then you can buy me a coffee.
+<br/><br/>
+<a href="https://www.buymeacoffee.com/sharandac" target="_blank"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-%E2%82%AC5-orange?style=for-the-badge&logo=buy-me-a-coffee" /></a>
+</p>

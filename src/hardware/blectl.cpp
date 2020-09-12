@@ -57,9 +57,6 @@ BLECharacteristic *pBatteryPowerStateCharacteristic;
 char *gadgetbridge_msg = NULL;
 uint32_t gadgetbridge_msg_size = 0;
 
-/*
- *
- */
 class BleCtlServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer, esp_ble_gatts_cb_param_t* param ) {
         blectl_set_event( BLECTL_CONNECT );
@@ -82,9 +79,6 @@ class BleCtlServerCallbacks: public BLEServerCallbacks {
     }
 };
 
-/*
- *
- */
 class BtlCtlSecurity : public BLESecurityCallbacks {
 
     uint32_t onPassKeyRequest(){
@@ -209,10 +203,6 @@ class BleCtlCallbacks : public BLECharacteristicCallbacks
     }
 };
 
-
-/*
- *
- */
 void blectl_setup( void ) {
 
     blectl_status = xEventGroupCreate();
@@ -223,13 +213,28 @@ void blectl_setup( void ) {
     esp_bt_controller_mem_release( ESP_BT_MODE_IDLE );
     esp_bt_mem_release( ESP_BT_MODE_IDLE );
 
+    blectl_read_config();
+
     // Create the BLE Device
     // Name needs to match filter in Gadgetbridge's banglejs getSupportedType() function.
     // This is too long I think:
     // BLEDevice::init("Espruino Gadgetbridge Compatible Device");
     BLEDevice::init("Espruino (T-Watch2020)");
     // The minimum power level (-12dbm) ESP_PWR_LVL_N12 was too low
-    BLEDevice::setPower( ESP_PWR_LVL_N9 );
+    switch( blectl_config.txpower ) {
+        case 0:             BLEDevice::setPower( ESP_PWR_LVL_N12 );
+                            break;
+        case 1:             BLEDevice::setPower( ESP_PWR_LVL_N9 );
+                            break;
+        case 2:             BLEDevice::setPower( ESP_PWR_LVL_N6 );
+                            break;
+        case 3:             BLEDevice::setPower( ESP_PWR_LVL_N3 );
+                            break;
+        case 4:             BLEDevice::setPower( ESP_PWR_LVL_N0 );
+                            break;
+        default:            BLEDevice::setPower( ESP_PWR_LVL_N9 );
+                            break;
+    }
 
     // Enable encryption
     BLEServer* pServer = BLEDevice::createServer();
@@ -306,27 +311,18 @@ void blectl_setup( void ) {
     }
 }
 
-/*
- *
- */
 void blectl_set_event( EventBits_t bits ) {
     portENTER_CRITICAL(&blectlMux);
     xEventGroupSetBits( blectl_status, bits );
     portEXIT_CRITICAL(&blectlMux);
 }
 
-/*
- *
- */
 void blectl_clear_event( EventBits_t bits ) {
     portENTER_CRITICAL(&blectlMux);
     xEventGroupClearBits( blectl_status, bits );
     portEXIT_CRITICAL(&blectlMux);
 }
 
-/*
- *
- */
 bool blectl_get_event( EventBits_t bits ) {
     portENTER_CRITICAL(&blectlMux);
     EventBits_t temp = xEventGroupGetBits( blectl_status ) & bits;
@@ -362,9 +358,7 @@ void blectl_register_cb( EventBits_t event, BLECTL_CALLBACK_FUNC blectl_event_cb
     blectl_event_cb_table[ blectl_event_cb_entrys - 1 ].event_cb = blectl_event_cb;
     log_i("register blectl_event_cb success (%p)", blectl_event_cb_table[ blectl_event_cb_entrys - 1 ].event_cb );
 }
-/*
- *
- */
+
 void blectl_send_event_cb( EventBits_t event, char *msg ) {
     for ( int entry = 0 ; entry < blectl_event_cb_entrys ; entry++ ) {
         yield();
@@ -417,11 +411,9 @@ bool blectl_get_enable_on_standby( void ) {
 }
 
 bool blectl_get_advertising( void ) {
-    return( blectl_config.enable_on_standby );
+    return( blectl_config.advertising );
 }
-/*
- *
- */
+
 void blectl_save_config( void ) {
     fs::File file = SPIFFS.open( BLECTL_JSON_COFIG_FILE, FILE_WRITE );
 
@@ -433,6 +425,7 @@ void blectl_save_config( void ) {
 
         doc["advertising"] = blectl_config.advertising;
         doc["enable_on_standby"] = blectl_config.enable_on_standby;
+        doc["tx_power"] = blectl_config.txpower;
 
         if ( serializeJsonPretty( doc, file ) == 0) {
             log_e("Failed to write config file");
@@ -442,9 +435,6 @@ void blectl_save_config( void ) {
     file.close();
 }
 
-/*
- *
- */
 void blectl_read_config( void ) {
     if ( SPIFFS.exists( BLECTL_JSON_COFIG_FILE ) ) {        
         fs::File file = SPIFFS.open( BLECTL_JSON_COFIG_FILE, FILE_READ );
@@ -460,16 +450,15 @@ void blectl_read_config( void ) {
                 log_e("blectl deserializeJson() failed: %s", error.c_str() );
             }
             else {                
-                blectl_config.advertising = doc["advertising"].as<bool>();
-                blectl_config.enable_on_standby = doc["enable_on_standby"].as<bool>();
+                blectl_config.advertising = doc["advertising"] | true;
+                blectl_config.enable_on_standby = doc["enable_on_standby"] | false;
+                blectl_config.txpower = doc["tx_power"] | 1;
             }        
             doc.clear();
         }
         file.close();
     }
 }
-
-
 
 void blectl_update_battery( int32_t percent, bool charging, bool plug )
 {
