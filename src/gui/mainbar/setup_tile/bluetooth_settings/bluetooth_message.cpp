@@ -23,7 +23,7 @@
 #include "bluetooth_message.h"
 
 #include "gui/mainbar/mainbar.h"
-#include "gui/mainbar/setup_tile/setup.h"
+#include "gui/mainbar/setup_tile/setup_tile.h"
 #include "gui/statusbar.h"
 #include "hardware/blectl.h"
 #include "hardware/powermgm.h"
@@ -56,7 +56,7 @@ LV_FONT_DECLARE(Ubuntu_32px);
 
 src_icon_t src_icon[] = {
     { "Telegram", 50, &telegram_32px },
-    { "Whatsapp", 50, &whatsapp_32px },
+    { "WhatsApp", 50, &whatsapp_32px },
     { "K-9 Mail", 50, &k9mail_32px },
     { "Gmail", 50, &email_32px },
     { "E-Mail", 50, &message_32px },
