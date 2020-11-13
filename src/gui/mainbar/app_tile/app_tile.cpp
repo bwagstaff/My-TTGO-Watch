@@ -32,7 +32,7 @@ static lv_style_t app_style;
 void app_tile_setup( void ) {
 
     for ( int tiles = 0 ; tiles < MAX_APPS_TILES ; tiles++ ) {
-        app_tile_num[ tiles ] = mainbar_add_tile( 1 + tiles , 0 );
+        app_tile_num[ tiles ] = mainbar_add_tile( 1 + tiles , 0, "app tile" );
         app_cont[ tiles ] = mainbar_get_tile_obj( app_tile_num[ tiles ] );
     }
 
@@ -60,7 +60,7 @@ void app_tile_setup( void ) {
         lv_obj_set_hidden( app_entry[ app ].icon_cont, true );
         lv_obj_set_hidden( app_entry[ app ].label, true );
 
-        log_i("icon screen/x/y: %d/%d/%d", app / ( MAX_APPS_ICON_HORZ * MAX_APPS_ICON_VERT ), app_entry[ app ].x, app_entry[ app ].y );
+        log_d("icon screen/x/y: %d/%d/%d", app / ( MAX_APPS_ICON_HORZ * MAX_APPS_ICON_VERT ), app_entry[ app ].x, app_entry[ app ].y );
     }
 }
 

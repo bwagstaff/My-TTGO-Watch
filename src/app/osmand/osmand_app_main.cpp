@@ -86,12 +86,20 @@ struct direction_t direction[] = {
     { "droite et continuez", "franchement", &sharply_right_128px },
     { "gauche et continuez", "", &turn_left_128px },
     { "droite et continuez", "", &turn_right_128px },
+        // italian direction
+    { "Avanti", "", &ahead_128px },
+    { "sinistra", "leggermente", &slightly_left_128px },
+    { "destra", "leggermente", &slightly_right_128px },
+    { "sinistra", "bruscamente", &sharply_left_128px },
+    { "destra", "bruscamente", &sharply_right_128px },
+    { "gira a sinistra", "", &turn_left_128px },
+    { "gira a destra", "", &turn_right_128px },
     { "", "", NULL }
 };
 
 static void exit_osmand_app_main_event_cb( lv_obj_t * obj, lv_event_t event );
-static void osmand_bluetooth_message_event_cb( EventBits_t event, char* msg );
-void osmand_bluetooth_message_msg_pharse( char* msg );
+bool osmand_bluetooth_message_event_cb( EventBits_t event, void *arg );
+void osmand_bluetooth_message_msg_pharse( const char* msg );
 const lv_img_dsc_t *osmand_find_direction_img( const char * msg );
 void osmand_activate_cb( void );
 void osmand_hibernate_cb( void );
@@ -140,35 +148,44 @@ void osmand_app_main_setup( uint32_t tile_num ) {
 
     osmand_app_info_label = lv_label_create( osmand_app_main_tile, NULL);
     lv_obj_add_style( osmand_app_info_label, LV_OBJ_PART_MAIN, &osmand_app_main_style  );
-    lv_label_set_text( osmand_app_info_label, "wait for osmand msg");
+    lv_label_set_text( osmand_app_info_label, "no bluetooth connection");
     lv_obj_align( osmand_app_info_label, osmand_app_distance_label, LV_ALIGN_OUT_BOTTOM_MID, 0, 5 );
 
     mainbar_add_tile_activate_cb( tile_num, osmand_activate_cb );
     mainbar_add_tile_hibernate_cb( tile_num, osmand_hibernate_cb );
 
-    blectl_register_cb( BLECTL_MSG, osmand_bluetooth_message_event_cb );
+    blectl_register_cb( BLECTL_MSG | BLECTL_CONNECT | BLECTL_DISCONNECT , osmand_bluetooth_message_event_cb, "OsmAnd main" );
 }
 
 static void exit_osmand_app_main_event_cb( lv_obj_t * obj, lv_event_t event ) {
     switch( event ) {
-        case( LV_EVENT_CLICKED ):       mainbar_jump_to_maintile( LV_ANIM_OFF );
-                                        break;
+        case( LV_EVENT_CLICKED ):   
+            mainbar_jump_to_maintile( LV_ANIM_OFF );
+            break;
     }
 }
 
-static void osmand_bluetooth_message_event_cb( EventBits_t event, char* msg ) {
+bool osmand_bluetooth_message_event_cb( EventBits_t event, void *arg ) {
     switch( event ) {
-        case BLECTL_MSG:            osmand_bluetooth_message_msg_pharse( msg );
-                                    break;
+        case BLECTL_MSG:            
+            osmand_bluetooth_message_msg_pharse( (const char*)arg );
+            break;
+        case BLECTL_CONNECT:
+            lv_label_set_text( osmand_app_info_label, "wait for OsmAnd msg");
+            lv_obj_align( osmand_app_info_label, osmand_app_distance_label, LV_ALIGN_OUT_BOTTOM_MID, 0, 5 );
+            break;
+        case BLECTL_DISCONNECT:     
+            lv_label_set_text( osmand_app_info_label, "no bluetooth connection");
+            lv_obj_align( osmand_app_info_label, osmand_app_distance_label, LV_ALIGN_OUT_BOTTOM_MID, 0, 5 );
+            break;
     }
+    return( true );
 }
 
-void osmand_bluetooth_message_msg_pharse( char* msg ) {
+void osmand_bluetooth_message_msg_pharse( const char* msg ) {
     if ( osmand_active == false ) {
         return;
     }
-
-    log_i("msg: %s", msg );
 
     SpiRamJsonDocument doc( strlen( msg ) * 2 );
 
@@ -218,8 +235,6 @@ void osmand_activate_cb( void ) {
     osmand_block_return_maintile = display_get_block_return_maintile();
     display_set_block_return_maintile( true );
     _osmand_app_task = lv_task_create(osmand_app_task, 1000,  LV_TASK_PRIO_LOWEST, NULL );
-    lv_label_set_text( osmand_app_info_label, "wait for OsmAnd msg");
-    lv_obj_align( osmand_app_info_label, osmand_app_distance_label, LV_ALIGN_OUT_BOTTOM_MID, 0, 5 );
 }
 
 void osmand_hibernate_cb( void ) {

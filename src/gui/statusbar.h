@@ -26,7 +26,7 @@
     #include "config.h"
 
     #define STATUSBAR_HEIGHT            26
-    #define STATUSBAR_EXPAND_HEIGHT     160
+    #define STATUSBAR_EXPAND_HEIGHT     200
 
     typedef struct {
         lv_obj_t *icon;
@@ -40,6 +40,7 @@
         STATUSBAR_BATTERY,
         STATUSBAR_BLUETOOTH,
         STATUSBAR_WIFI,
+        STATUSBAR_VOLUME,
         STATUSBAR_BELL,
         STATUSBAR_WARNING,
         STATUSBAR_ALARM,
@@ -57,56 +58,45 @@
         STATUSBAR_STYLE_NUM
     } statusbar_style_t;
 
-    /*
+    /**
      * @brief setup statusbar
      */
     void statusbar_setup( void );
-    /*
+    /**
      * @brief hide an icon from statusbar
      * 
      * @param icon  icon name
      */
     void statusbar_hide_icon( statusbar_icon_t icon );
-    /*
+    /**
      * @brief show an icon from statusbar
      * 
      * @param icon  icon name
      */
     void statusbar_show_icon( statusbar_icon_t icon );
-    /*
+    /**
      * @brief hide an icon from statusbar
      * 
      * @param icon  icon name
      * @param style style name
      */
     void statusbar_style_icon( statusbar_icon_t icon, statusbar_style_t style );
-    /*
+    /**
      * @brief refresh/redraw statusbar
      */
     void statusbar_refresh( void );
-    /*
-     * @brief update battery icon and ther state
-     * 
-     * @param   percent     displayed value in percent
-     * @param   charging    true or false, true means charging
-     * @param   plug        true or false, true means pluged
-     */
-    void statusbar_update_battery( int32_t percent, bool charging, bool plug );
-    /*
-     * @brief   set wifistate and label
-     * 
-     * @param   state       true or false, true means active
-     * @param   wifiname    label to displayed text like "scan","connecting" and so on
-     */
-    void statusbar_wifi_set_state( bool state, const char *wifiname );
-    void statusbar_wifi_set_ip_state( bool state, const char *ip );
-    void statusbar_bluetooth_set_state( bool state );
-    /*
+    /**
      * @brief hide the statusbar
      * 
      * @param   hide    true or false, ture means statusbar is hide
      */
     void statusbar_hide( bool hide );
+    /**
+     * @brief expand the statusbar
+     * 
+     * @param   expand  true if expand of false if not
+     */
+    void statusbar_expand( bool expand );
 
 #endif // _STATUSBAR_H
 

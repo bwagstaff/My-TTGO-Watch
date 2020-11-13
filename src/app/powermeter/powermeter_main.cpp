@@ -36,6 +36,7 @@
 
 #include "hardware/wifictl.h"
 #include "hardware/json_psram_allocator.h"
+#include "hardware/alloc.h"
 
 lv_obj_t *powermeter_main_tile = NULL;
 lv_style_t powermeter_main_style;
@@ -61,16 +62,16 @@ LV_IMG_DECLARE(refresh_32px);
 LV_FONT_DECLARE(Ubuntu_16px);
 LV_FONT_DECLARE(Ubuntu_48px);
 
-static void powermeter_wifictl_event_cb( EventBits_t event, char *msg );
+bool powermeter_wifictl_event_cb( EventBits_t event, void *arg );
 static void exit_powermeter_main_event_cb( lv_obj_t * obj, lv_event_t event );
 static void enter_powermeter_setup_event_cb( lv_obj_t * obj, lv_event_t event );
 void powermeter_main_task( lv_task_t * task );
 
 void callback(char* topic, byte* payload, unsigned int length) {
     char *msg = NULL;
-    msg = (char*)ps_calloc( length + 1, 1 );
+    msg = (char*)CALLOC( length + 1, 1 );
     if ( msg == NULL ) {
-        log_e("ps_calloc failed");
+        log_e("calloc failed");
         return;
     }
     memcpy( msg, payload, length );
@@ -204,12 +205,12 @@ void powermeter_main_tile_setup( uint32_t tile_num ) {
     powermeter_mqtt_client.setCallback( callback );
     powermeter_mqtt_client.setBufferSize( 512 );
 
-    wifictl_register_cb( WIFICTL_CONNECT_IP | WIFICTL_OFF_REQUEST | WIFICTL_OFF | WIFICTL_DISCONNECT , powermeter_wifictl_event_cb );
+    wifictl_register_cb( WIFICTL_CONNECT_IP | WIFICTL_OFF_REQUEST | WIFICTL_OFF | WIFICTL_DISCONNECT , powermeter_wifictl_event_cb, "powermeter" );
     // create an task that runs every secound
     _powermeter_main_task = lv_task_create( powermeter_main_task, 250, LV_TASK_PRIO_MID, NULL );
 }
 
-static void powermeter_wifictl_event_cb( EventBits_t event, char *msg ) {
+bool powermeter_wifictl_event_cb( EventBits_t event, void *arg ) {
     powermeter_config_t *powermeter_config = powermeter_get_config();
     switch( event ) {
         case WIFICTL_CONNECT_IP:    if ( powermeter_config->autoconnect ) {
@@ -236,6 +237,7 @@ static void powermeter_wifictl_event_cb( EventBits_t event, char *msg ) {
                                     widget_set_label( powermeter_get_widget_icon(), "n/a" );
                                     break;
     }
+    return( true );
 }
 
 static void enter_powermeter_setup_event_cb( lv_obj_t * obj, lv_event_t event ) {

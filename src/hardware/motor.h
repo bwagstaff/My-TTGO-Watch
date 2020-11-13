@@ -24,40 +24,44 @@
 
     #include "TTGO.h"
 
-    #define MOTOR_CONFIG_FILE  "/motor.cfg"
-    #define MOTOR_JSON_CONFIG_FILE  "/motor.json"
+    #define MOTOR_JSON_CONFIG_FILE  "/motor.json"           /** @brief defines binary config file name */
 
+    /**
+     * @brief motor config structure in memory
+     */
     typedef struct {
-        bool vibe = true;
+        bool vibe = true;           /** @brief vibe config item, true if vibe enabled, false if disabled */
     } motor_config_t;
 
-    /*
+    /**
      * @brief setup motor I/O
      */
     void motor_setup( void );
-    /*
+    /**
      * @brief let vibe motor for n * 10ms
      * 
      * @param   time    time in 10ms
+     * @enforce motor will vibrate even if "vibe feedback" option is deactivated
+     *  It is usefull for alrm or notifications which can be set independently
      */
-    void motor_vibe( int time );
+    void motor_vibe( int time, bool enforced = false );
     /*
      * @brief   get the current vibe configuration
      * 
      * @return  bool    true means vibe enable, false means disable
      */
     bool motor_get_vibe_config( void );
-    /*
+    /**
      * @brief   set the current vibe configuration
      * 
      * @param   enable    true means vibe enable, false means disable
      */
     void motor_set_vibe_config( bool enable );
-    /*
+    /**
      * @brief  store the current configuration to SPIFFS
      */
     void motor_save_config( void );
-    /*
+    /**
      * @brief   read the configuration from SPIFFS
      */
     void motor_read_config( void );

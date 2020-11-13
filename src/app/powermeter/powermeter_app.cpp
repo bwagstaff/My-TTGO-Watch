@@ -54,7 +54,7 @@ void powermeter_app_setup( void ) {
     powermeter_load_config();
 
     // register 2 vertical tiles and get the first tile number and save it for later use
-    powermeter_app_main_tile_num = mainbar_add_app_tile( 1, 3 );
+    powermeter_app_main_tile_num = mainbar_add_app_tile( 1, 3, "Powermeter App" );
     powermeter_app_setup_tile_num = powermeter_app_main_tile_num + 1;
 
     powermeter_app = app_register( "power-\nmeter", &powermeter_64px, enter_powermeter_app_event_cb );
@@ -103,7 +103,7 @@ void powermeter_load_config( void ) {
     }
     else {
         int filesize = file.size();
-        SpiRamJsonDocument doc( filesize * 2 );
+        SpiRamJsonDocument doc( filesize * 4 );
 
         DeserializationError error = deserializeJson( doc, file );
         if ( error ) {
@@ -111,7 +111,7 @@ void powermeter_load_config( void ) {
         }
         else {
             strlcpy( powermeter_config.server, doc["powermeter"]["server"], sizeof( powermeter_config.server ) );
-            powermeter_config.port = doc["powermeter"]["port"] | 1883;
+	    powermeter_config.port = doc["powermeter"]["port"] | 1883;
             powermeter_config.ssl = doc["powermeter"]["ssl"] | false;
             strlcpy( powermeter_config.user, doc["powermeter"]["user"], sizeof( powermeter_config.user ) );
             strlcpy( powermeter_config.password, doc["powermeter"]["password"], sizeof( powermeter_config.password ) );
@@ -139,6 +139,7 @@ void powermeter_save_config( void ) {
         doc["powermeter"]["user"] = powermeter_config.user;
         doc["powermeter"]["password"] = powermeter_config.password;
         doc["powermeter"]["topic"] = powermeter_config.topic;
+        doc["powermeter"]["port"] = powermeter_config.port;
         doc["powermeter"]["autoconnect"] = powermeter_config.autoconnect;
         doc["powermeter"]["widget"] = powermeter_config.widget;
 
@@ -166,14 +167,6 @@ bool powermeter_add_widget( void ) {
 }
 
 bool powermeter_remove_widget( void ) {
-    if ( powermeter_widget != NULL ) {
-        if ( widget_remove( powermeter_widget ) ) {
-            powermeter_widget = NULL;
-            return( true );
-        }
-        else {
-            return( false );
-        }
-    }
+    powermeter_widget = widget_remove( powermeter_widget );
     return( true );
 }

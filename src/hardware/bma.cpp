@@ -20,34 +20,41 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 #include "config.h"
+#include <stdio.h>
+#include <time.h>
 #include <TTGO.h>
 #include <soc/rtc.h>
 
 #include "bma.h"
 #include "powermgm.h"
+#include "callback.h"
 #include "json_psram_allocator.h"
+#include "alloc.h"
 
 #include "gui/statusbar.h"
 
-EventGroupHandle_t bma_event_handle = NULL;
-bma_config_t bma_config[ BMA_CONFIG_NUM ];
+volatile bool DRAM_ATTR bma_irq_flag = false;
+portMUX_TYPE DRAM_ATTR BMA_IRQ_Mux = portMUX_INITIALIZER_UNLOCKED;
 
 __NOINIT_ATTR uint32_t stepcounter_valid;
 __NOINIT_ATTR uint32_t stepcounter_before_reset;
 __NOINIT_ATTR uint32_t stepcounter;
 
-bma_event_cb_t *bma_event_cb_table = NULL;
-uint32_t bma_event_cb_entrys = 0;
+static char bma_date[16];
+static char bma_old_date[16];
+
+bma_config_t bma_config[ BMA_CONFIG_NUM ];
+callback_t *bma_callback = NULL;
 
 bool first_loop_run = true;
 
 void IRAM_ATTR bma_irq( void );
-void bma_send_event_cb( EventBits_t event, const char *msg );
+bool bma_send_event_cb( EventBits_t event, void *arg );
+bool bma_powermgm_event_cb( EventBits_t event, void *arg );
+bool bma_powermgm_loop_cb( EventBits_t event, void *arg );
 
 void bma_setup( void ) {
     TTGOClass *ttgo = TTGOClass::getWatch();
-
-    bma_event_handle = xEventGroupCreate();
 
     for ( int i = 0 ; i < BMA_CONFIG_NUM ; i++ ) {
         bma_config[ i ].enable = true;
@@ -72,30 +79,68 @@ void bma_setup( void ) {
     attachInterrupt( BMA423_INT1, bma_irq, RISING );
 
     bma_reload_settings();
+
+    powermgm_register_cb( POWERMGM_SILENCE_WAKEUP | POWERMGM_STANDBY | POWERMGM_WAKEUP, bma_powermgm_event_cb, "bma" );
+    powermgm_register_loop_cb( POWERMGM_SILENCE_WAKEUP | POWERMGM_STANDBY | POWERMGM_WAKEUP, bma_powermgm_loop_cb, "bma loop" );
+}
+
+bool bma_powermgm_event_cb( EventBits_t event, void *arg ) {
+    switch( event ) {
+        case POWERMGM_STANDBY:          bma_standby();
+                                        break;
+        case POWERMGM_WAKEUP:           bma_wakeup();
+                                        break;
+        case POWERMGM_SILENCE_WAKEUP:   bma_wakeup();
+                                        break;
+    }
+    return( true );
+}
+
+bool bma_powermgm_loop_cb( EventBits_t event , void *arg ) {
+    bma_loop();
+    return( true );
 }
 
 void bma_standby( void ) {
-  TTGOClass *ttgo = TTGOClass::getWatch();
+    TTGOClass *ttgo = TTGOClass::getWatch();
+    time_t now;
+    tm info;
 
-  log_i("go standby");
+    log_i("go standby");
 
-  if ( bma_get_config( BMA_STEPCOUNTER ) )
-      ttgo->bma->enableStepCountInterrupt( false );
+    if ( bma_get_config( BMA_STEPCOUNTER ) )
+        ttgo->bma->enableStepCountInterrupt( false );
 
+    time( &now );
+    localtime_r( &now, &info );
+    strftime( bma_old_date, sizeof( bma_old_date ), "%d.%b", &info );
+
+    gpio_wakeup_enable ( (gpio_num_t)BMA423_INT1, GPIO_INTR_HIGH_LEVEL );
+    esp_sleep_enable_gpio_wakeup ();
 }
 
 void bma_wakeup( void ) {
     TTGOClass *ttgo = TTGOClass::getWatch();
+    time_t now;
+    tm info;
 
     log_i("go wakeup");
 
     if ( bma_get_config( BMA_STEPCOUNTER ) )
         ttgo->bma->enableStepCountInterrupt( true );
 
-    stepcounter_before_reset = ttgo->bma->getCounter();
-    char msg[16]="";
-    snprintf( msg, sizeof( msg ),"%d", stepcounter + ttgo->bma->getCounter() );
-    bma_send_event_cb( BMACTL_STEPCOUNTER, msg );
+    time( &now );
+    localtime_r( &now, &info );
+    strftime( bma_date, sizeof( bma_date ), "%d.%b", &info );
+    if ( strcmp( bma_date, bma_old_date ) ) {
+        if ( bma_get_config( BMA_DAILY_STEPCOUNTER ) ) {
+            log_i("reset setcounter: %s != %s", bma_date, bma_old_date );
+            ttgo->bma->resetStepCounter();
+            strftime( bma_old_date, sizeof( bma_old_date ), "%d.%b", &info );
+        }
+    }
+
+    first_loop_run = true;
 }
 
 void bma_reload_settings( void ) {
@@ -108,41 +153,38 @@ void bma_reload_settings( void ) {
 }
 
 void IRAM_ATTR bma_irq( void ) {
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
-    xEventGroupSetBitsFromISR( bma_event_handle, BMACTL_EVENT_INT, &xHigherPriorityTaskWoken );
-
-    if ( xHigherPriorityTaskWoken )
-    {
-        portYIELD_FROM_ISR ();
-    }
+    portENTER_CRITICAL_ISR(&BMA_IRQ_Mux);
+    bma_irq_flag = true;
+    portEXIT_CRITICAL_ISR(&BMA_IRQ_Mux);
 }
 
 void bma_loop( void ) {
     TTGOClass *ttgo = TTGOClass::getWatch();
+
     /*
      * handle IRQ event
      */
-    if ( xEventGroupGetBitsFromISR( bma_event_handle ) & BMACTL_EVENT_INT ) {                
-      while( !ttgo->bma->readInterrupt() );
+    portENTER_CRITICAL(&BMA_IRQ_Mux);
+    bool temp_bma_irq_flag = bma_irq_flag;
+    bma_irq_flag = false;
+    portEXIT_CRITICAL(&BMA_IRQ_Mux);
+
+    if ( temp_bma_irq_flag ) {                
+        while( !ttgo->bma->readInterrupt() );
+
         if ( ttgo->bma->isDoubleClick() ) {
             powermgm_set_event( POWERMGM_BMA_DOUBLECLICK );
-            xEventGroupClearBitsFromISR( bma_event_handle, BMACTL_EVENT_INT );
-            bma_send_event_cb( BMACTL_DOUBLECLICK, "" );
-            return;
+            bma_send_event_cb( BMACTL_DOUBLECLICK, (void *)"" );
         }
         if ( ttgo->bma->isTilt() ) {
             powermgm_set_event( POWERMGM_BMA_TILT );
-            xEventGroupClearBitsFromISR( bma_event_handle, BMACTL_EVENT_INT );
-            bma_send_event_cb( BMACTL_TILT, "" );
-            return;
+            bma_send_event_cb( BMACTL_TILT, (void *)"" );
         }
         if ( ttgo->bma->isStepCounter() ) {
             stepcounter_before_reset = ttgo->bma->getCounter();
             char msg[16]="";
             snprintf( msg, sizeof( msg ),"%d", stepcounter + stepcounter_before_reset );
-            bma_send_event_cb( BMACTL_STEPCOUNTER, msg );
-            xEventGroupClearBitsFromISR( bma_event_handle, BMACTL_EVENT_INT );
+            bma_send_event_cb( BMACTL_STEPCOUNTER, (void *)msg );
         }
     }
 
@@ -156,52 +198,22 @@ void bma_loop( void ) {
     }
 }
 
-void bma_register_cb( EventBits_t event, BMA_CALLBACK_FUNC bma_event_cb ) {
-    bma_event_cb_entrys++;
-
-    if ( bma_event_cb_table == NULL ) {
-        bma_event_cb_table = ( bma_event_cb_t * )ps_malloc( sizeof( bma_event_cb_t ) * bma_event_cb_entrys );
-        if ( bma_event_cb_table == NULL ) {
-            log_e("rtc_event_cb_table malloc faild");
+bool bma_register_cb( EventBits_t event, CALLBACK_FUNC callback_func, const char *id ) {
+    if ( bma_callback == NULL ) {
+        bma_callback = callback_init( "bma" );
+        if ( bma_callback == NULL ) {
+            log_e("bma_callback alloc failed");
             while(true);
         }
     }
-    else {
-        bma_event_cb_t *new_bma_event_cb_table = NULL;
-
-        new_bma_event_cb_table = ( bma_event_cb_t * )ps_realloc( bma_event_cb_table, sizeof( bma_event_cb_t ) * bma_event_cb_entrys );
-        if ( new_bma_event_cb_table == NULL ) {
-            log_e("rtc_event_cb_table realloc faild");
-            while(true);
-        }
-        bma_event_cb_table = new_bma_event_cb_table;
-    }
-
-    bma_event_cb_table[ bma_event_cb_entrys - 1 ].event = event;
-    bma_event_cb_table[ bma_event_cb_entrys - 1 ].event_cb = bma_event_cb;
-    log_i("register rtc_event_cb success (%p)", bma_event_cb_table[ bma_event_cb_entrys - 1 ].event_cb );
+    return( callback_register( bma_callback, event, callback_func, id ) );
 }
 
-void bma_send_event_cb( EventBits_t event, const char *msg ) {
-    if ( bma_event_cb_entrys == 0 ) {
-      return;
-    }
-      
-    for ( int entry = 0 ; entry < bma_event_cb_entrys ; entry++ ) {
-        yield();
-        if ( event & bma_event_cb_table[ entry ].event ) {
-            log_i("call bma_event_cb (%p)", bma_event_cb_table[ entry ].event_cb );
-            bma_event_cb_table[ entry ].event_cb( event, msg );
-        }
-    }
+bool bma_send_event_cb( EventBits_t event, void *arg ) {
+    return( callback_send( bma_callback, event, arg ) );
 }
 
 void bma_save_config( void ) {
-    if ( SPIFFS.exists( BMA_COFIG_FILE ) ) {
-        SPIFFS.remove( BMA_COFIG_FILE );
-        log_i("remove old binary bma config");
-    }
-
     fs::File file = SPIFFS.open( BMA_JSON_COFIG_FILE, FILE_WRITE );
 
     if (!file) {
@@ -213,6 +225,7 @@ void bma_save_config( void ) {
         doc["stepcounter"] = bma_config[ BMA_STEPCOUNTER ].enable;
         doc["doubleclick"] = bma_config[ BMA_DOUBLECLICK ].enable;
         doc["tilt"] = bma_config[ BMA_TILT ].enable;
+        doc["daily_stepcounter"] = bma_config[ BMA_DAILY_STEPCOUNTER ].enable;
 
         if ( serializeJsonPretty( doc, file ) == 0) {
             log_e("Failed to write config file");
@@ -223,49 +236,27 @@ void bma_save_config( void ) {
 }
 
 void bma_read_config( void ) {
-    if ( SPIFFS.exists( BMA_JSON_COFIG_FILE ) ) {        
-        fs::File file = SPIFFS.open( BMA_JSON_COFIG_FILE, FILE_READ );
-        if (!file) {
-            log_e("Can't open file: %s!", BMA_JSON_COFIG_FILE );
-        }
-        else {
-            int filesize = file.size();
-            SpiRamJsonDocument doc( filesize * 2 );
-
-            DeserializationError error = deserializeJson( doc, file );
-            if ( error ) {
-                log_e("update check deserializeJson() failed: %s", error.c_str() );
-            }
-            else {
-                bma_config[ BMA_STEPCOUNTER ].enable = doc["stepcounter"] | true;
-                bma_config[ BMA_DOUBLECLICK ].enable = doc["doubleclick"] | true;
-                bma_config[ BMA_TILT ].enable = doc["tilt"] | false;
-            }        
-            doc.clear();
-        }
-        file.close();
+    fs::File file = SPIFFS.open( BMA_JSON_COFIG_FILE, FILE_READ );
+    if (!file) {
+        log_e("Can't open file: %s!", BMA_JSON_COFIG_FILE );
     }
     else {
-        log_i("no json config exists, read from binary");
-        fs::File file = SPIFFS.open( BMA_COFIG_FILE, FILE_READ );
+        int filesize = file.size();
+        SpiRamJsonDocument doc( filesize * 2 );
 
-        if (!file) {
-            log_e("Can't open file: %s!", BMA_COFIG_FILE );
+        DeserializationError error = deserializeJson( doc, file );
+        if ( error ) {
+            log_e("update check deserializeJson() failed: %s", error.c_str() );
         }
         else {
-            int filesize = file.size();
-            if ( filesize > sizeof( bma_config ) ) {
-                log_e("Failed to read configfile. Wrong filesize!" );
-            }
-            else {
-                file.read( (uint8_t *)bma_config, filesize );
-                file.close();
-                bma_save_config();
-                return; 
-            }
-        file.close();
-        }
+            bma_config[ BMA_STEPCOUNTER ].enable = doc["stepcounter"] | true;
+            bma_config[ BMA_DOUBLECLICK ].enable = doc["doubleclick"] | true;
+            bma_config[ BMA_TILT ].enable = doc["tilt"] | false;
+            bma_config[ BMA_DAILY_STEPCOUNTER ].enable = doc["daily_stepcounter"] | false;
+        }        
+        doc.clear();
     }
+    file.close();
 }
 
 bool bma_get_config( int config ) {

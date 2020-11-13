@@ -35,7 +35,7 @@ lv_style_t setup_style;
 void setup_tile_setup( void ) {
 
     for ( int tiles = 0 ; tiles < MAX_SETUP_TILES ; tiles++ ) {
-        setup_tile_num[ tiles ] = mainbar_add_tile( 1 + tiles , 1 );
+        setup_tile_num[ tiles ] = mainbar_add_tile( 1 + tiles , 1, "setup tile" );
         setup_cont[ tiles ] = mainbar_get_tile_obj( setup_tile_num[ tiles ] );
     }
 
@@ -63,7 +63,7 @@ void setup_tile_setup( void ) {
         lv_obj_set_hidden( setup_entry[ setup ].icon_cont, true );
         lv_obj_set_hidden( setup_entry[ setup ].label, true );
 
-        log_i("icon screen/x/y: %d/%d/%d", setup / ( MAX_SETUP_ICON_HORZ * MAX_SETUP_ICON_VERT ), setup_entry[ setup ].x, setup_entry[ setup ].y );
+        log_d("icon screen/x/y: %d/%d/%d", setup / ( MAX_SETUP_ICON_HORZ * MAX_SETUP_ICON_VERT ), setup_entry[ setup ].x, setup_entry[ setup ].y );
     }
 }
 

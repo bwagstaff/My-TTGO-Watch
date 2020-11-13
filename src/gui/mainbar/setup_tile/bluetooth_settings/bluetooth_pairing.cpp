@@ -41,11 +41,11 @@ LV_IMG_DECLARE(bluetooth_64px);
 LV_FONT_DECLARE(Ubuntu_32px);
 
 static void exit_bluetooth_pairing_event_cb( lv_obj_t * obj, lv_event_t event );
-static void bluetooth_pairing_event_cb( EventBits_t event, char* msg );
+bool bluetooth_pairing_event_cb( EventBits_t event, void *arg );
 
 void bluetooth_pairing_tile_setup( void ) {
     // get an app tile and copy mainstyle
-    bluetooth_pairing_tile_num = mainbar_add_app_tile( 1, 1 );
+    bluetooth_pairing_tile_num = mainbar_add_app_tile( 1, 1, "bluetooth pairing" );
     bluetooth_pairing_tile = mainbar_get_tile_obj( bluetooth_pairing_tile_num );
 
     lv_style_copy( &bluetooth_pairing_style, mainbar_get_style() );
@@ -73,22 +73,22 @@ void bluetooth_pairing_tile_setup( void ) {
     lv_label_set_text( bluetooth_pairing_info_label, "");
     lv_obj_align( bluetooth_pairing_info_label, bluetooth_pairing_img, LV_ALIGN_OUT_BOTTOM_MID, 0, 5 );
 
-    blectl_register_cb( BLECTL_PIN_AUTH | BLECTL_PAIRING_SUCCESS | BLECTL_PAIRING_ABORT, bluetooth_pairing_event_cb );
+    blectl_register_cb( BLECTL_PIN_AUTH | BLECTL_PAIRING_SUCCESS | BLECTL_PAIRING_ABORT, bluetooth_pairing_event_cb, "bluetooth pairing" );
 }
 
-static void bluetooth_pairing_event_cb( EventBits_t event, char* msg ) {
+bool bluetooth_pairing_event_cb( EventBits_t event, void *arg ) {
     switch( event ) {
         case BLECTL_PIN_AUTH:           statusbar_hide( true );
                                         powermgm_set_event( POWERMGM_WAKEUP_REQUEST );
                                         mainbar_jump_to_tilenumber( bluetooth_pairing_tile_num, LV_ANIM_OFF );
-                                        lv_label_set_text( bluetooth_pairing_info_label, msg );
+                                        lv_label_set_text( bluetooth_pairing_info_label, (const char*)arg );
                                         lv_obj_align( bluetooth_pairing_info_label, bluetooth_pairing_img, LV_ALIGN_OUT_BOTTOM_MID, 0, 5 );
                                         lv_obj_invalidate( lv_scr_act() );
                                         motor_vibe(20);
                                         break;
         case BLECTL_PAIRING_SUCCESS:    statusbar_hide( true );
                                         powermgm_set_event( POWERMGM_WAKEUP_REQUEST );
-                                        lv_label_set_text( bluetooth_pairing_info_label, msg );
+                                        lv_label_set_text( bluetooth_pairing_info_label, (const char*)arg );
                                         lv_obj_align( bluetooth_pairing_info_label, bluetooth_pairing_img, LV_ALIGN_OUT_BOTTOM_MID, 0, 5 );
                                         mainbar_jump_to_tilenumber( bluetooth_pairing_tile_num, LV_ANIM_OFF );
                                         lv_obj_invalidate( lv_scr_act() );
@@ -96,13 +96,14 @@ static void bluetooth_pairing_event_cb( EventBits_t event, char* msg ) {
                                         break;
         case BLECTL_PAIRING_ABORT:      statusbar_hide( true );
                                         powermgm_set_event( POWERMGM_WAKEUP_REQUEST );
-                                        lv_label_set_text( bluetooth_pairing_info_label, msg );
+                                        lv_label_set_text( bluetooth_pairing_info_label, (const char*)arg );
                                         lv_obj_align( bluetooth_pairing_info_label, bluetooth_pairing_img, LV_ALIGN_OUT_BOTTOM_MID, 0, 5 );
                                         mainbar_jump_to_tilenumber( bluetooth_pairing_tile_num, LV_ANIM_OFF );
                                         lv_obj_invalidate( lv_scr_act() );
                                         motor_vibe(20);
                                         break;
     }
+    return( true );
 }
 
 static void exit_bluetooth_pairing_event_cb( lv_obj_t * obj, lv_event_t event ) {

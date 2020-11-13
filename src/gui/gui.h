@@ -25,7 +25,17 @@
 
     #include <TTGO.h>
     
+    #define BACKGROUNDIMAGE    "/spiffs/bg.png"
+
+    /**
+     * @brief GUI setup
+     */
     void gui_setup( void );
-    void gui_loop( void );
+    /**
+     * @brief set the background
+     * 
+     * @param   background_image    background image index 0...4
+     */
+    void gui_set_background_image ( uint32_t background_image);
 
 #endif // _STATUSBAR_H

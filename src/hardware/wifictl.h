@@ -23,11 +23,10 @@
     #define _WIFICTL_H
 
     #include "TTGO.h"
+    #include "callback.h"
 
     #define WIFICTL_DELAY               10
     #define NETWORKLIST_ENTRYS          20
-    #define WIFICTL_LIST_FILE           "/wifilist.cfg"
-    #define WIFICTL_CONFIG_FILE         "/wificfg.cfg"
     #define WIFICTL_JSON_CONFIG_FILE    "/wificfg.json"
 
     #define ESP_WPS_MODE                WPS_TYPE_PBC
@@ -36,22 +35,25 @@
     #define ESP_MODEL_NAME              "LILYGO T-WATCH2020 V1"
     #define ESP_DEVICE_NAME             "ESP STATION"
 
+    /**
+     * @brief network list structure
+     */
     typedef struct {
         char ssid[64]="";
         char password[64]="";
     } networklist;
 
+    /**
+     * @brief wifictl config structure
+     */
     typedef struct {
-        bool autoon = true;
-        bool webserver = false;
+        bool autoon = true;             /** @brief enable on auto on/off an wakeup and standby */
+        bool webserver = false;         /** @brief enable on webserver */
+        bool ftpserver = false;         /** @brief enable on ftpserver */
+        char ftpuser[32];   /** @brief ftpserver username*/
+        char ftppass[32];  /** @brief ftpserver password*/
+        bool enable_on_standby = false; /** @brief enable on standby */
     } wifictl_config_t;
-
-    typedef void ( * WIFICTL_CALLBACK_FUNC ) ( EventBits_t event, char *msg );
-    
-    typedef struct {
-        EventBits_t event;
-        WIFICTL_CALLBACK_FUNC event_cb;
-    } wifictl_event_cb_t;
 
     enum wifictl_event_t {
         WIFICTL_CONNECT                = _BV(0),
@@ -66,14 +68,15 @@
         WIFICTL_WPS_SUCCESS            = _BV(9),
         WIFICTL_WPS_FAILED             = _BV(10),
         WIFICTL_SCAN                   = _BV(11),
-        WIFICTL_FIRST_RUN              = _BV(12)
+        WIFICTL_FIRST_RUN              = _BV(12),
+        WIFICTL_AUTOON                 = _BV(13)
     };
 
-    /*
+    /**
      * @brief setup wifi controller routine
      */
     void wifictl_setup( void );
-    /*
+    /**
      * @brief check if networkname known
      * 
      * @param   networkname network name to check
@@ -81,7 +84,7 @@
      * @return  bool    true means network is known, false means network is unlknown
      */
     bool wifictl_is_known( const char* networkname );
-    /*
+    /**
      * @brief insert or add an new ssid/password to the known network list
      * 
      * @param ssid      pointer to an network name
@@ -90,7 +93,7 @@
      * @return  bool    true if was success or false if fail
      */
     bool wifictl_insert_network( const char *ssid, const char *password );
-    /*
+    /**
      * @brief delete ssid from network list
      * 
      * @param   ssid    pointer to an network name
@@ -98,23 +101,23 @@
      * @return  true if was success or false if fail
      */
     bool wifictl_delete_network( const char *ssid );
-    /*
+    /**
      * @brief switch on wifi
      */
     void wifictl_on( void );
-    /*
+    /**
      * @brief switch off wifi
      */
     void wifictl_off( void );
-    /*
+    /**
      * @brief set wifi in standby
      */
     void wifictl_standby( void );
-    /*
+    /**
      * @brief wakeup wifi
      */
     void wifictl_wakeup( void );
-    /*
+    /**
      * @brief registers a callback function which is called on a corresponding event
      * 
      * @param   event  possible values: WIFICTL_CONNECT,
@@ -131,35 +134,61 @@
      *                                      WIFICTL_SCAN,      
      *                                      WIFICTL_FIRST_RUN
      * @param   wifictl_event_cb   pointer to the callback function 
+     * @param   id      program id
      */
-    void wifictl_register_cb( EventBits_t event, WIFICTL_CALLBACK_FUNC wifictl_event_cb );
-    /*
+    bool wifictl_register_cb( EventBits_t event, CALLBACK_FUNC callback_func, const char *id );
+    /**
      * @brief get the current wifi auto on configuration
      * 
      * @return  true: wifi auto on enable, false: wifi auto on disable
      */
     bool wifictl_get_autoon( void );
-    /*
+    /**
      * @brief set the wifi auto on configuration
      * 
      * @param   autoon  true means auto on anable, false means auto on disable
      */
     void wifictl_set_autoon( bool autoon );
-    /*
+    /**
      * @brief   start an wifi wps peering
      */
     void wifictl_start_wps( void );
-    /*
+    /**
      * @brief   get the current webserver configuration
      * 
      * @return  true means webserver is enable, false webserver is disable
      */
     bool wifictl_get_webserver( void );
-    /*
+    /**
      * @brief   set the current werbserver configuration
      * 
      * @param   webserver   true means webserver enable, false means webserver disable
      */
     void wifictl_set_webserver( bool webserver );
+    /**
+     * @brief   get the current webserver configuration
+     * 
+     * @return  true means ftpserver is enable, false ftpserver is disable
+     */
+    bool wifictl_get_ftpserver( void );
+    /**
+     * @brief   set the current werbserver configuration
+     * 
+     * @param   ftpserver   true means ftpserver enable, false means ftpserver disable
+     */
+    void wifictl_set_ftpserver( bool ftpserver );
+    /**
+     * @brief   set wifi enable on standby
+     * 
+     * @param   enable  true if wifi an standby enabled, false if not
+     */
+    void wifictl_set_enable_on_standby( bool enable );
+    /**
+     * @brief   get wifi enable on standby
+     * 
+     * @return  true means enabled, false means disabled
+     */
+    bool wifictl_get_enable_on_standby( void );
+
 
 #endif // _WIFICTL_H
