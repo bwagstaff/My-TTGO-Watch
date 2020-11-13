@@ -24,9 +24,10 @@
 #ifndef _CONFIG_H 
     #define _CONFIG_H 
 
-    #define LILYGO_WATCH_2020_V1             //To use T-Watch2020, please uncomment this line
-    #define LILYGO_WATCH_LVGL                   //To use LVGL, you need to enable the macro LVGL
-    #define TWATCH_USE_PSRAM_ALLOC_LVGL
+    #define LILYGO_WATCH_2020_V1           //Required for T-Watch2020 V1 features
+    #define LILYGO_WATCH_LVGL              //Use Light Versatile Graphics Library
+    #define TWATCH_USE_PSRAM_ALLOC_LVGL    //Make LVGL use extended memory rather than default heap
+    
     #include <LilyGoWatch.h>
 
     /*

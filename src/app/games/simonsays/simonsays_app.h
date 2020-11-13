@@ -22,10 +22,15 @@
 #pragma once
 
 #include "app\games\gamebase.h"
+#include <memory>
 
 void tic_tac_toe_app_setup();
 
 class SimonSaysIcon;
+// class AudioGeneratorMP3;
+// class AudioFileSource;
+// class AudioOutputI2S;
+// class AudioFileSourceID3;
 
 class SimonSaysApp : public GameBase
 {
@@ -50,6 +55,14 @@ private:
     lv_style_t mStyleButtons[NUM_SQUARES];
     lv_obj_t *mButtons[NUM_SQUARES] = {0};
 
+    // Audio data
+    const char *mSounds[NUM_SQUARES] = {0};
+    // std::unique_ptr<AudioGeneratorMP3> mMp3;
+    // std::unique_ptr<AudioFileSource> mPlayingAudioFile;
+    // std::unique_ptr<AudioOutputI2S> mAudioOut;
+    // std::unique_ptr<AudioFileSourceID3> mId3;
+    //AudioFileSourceID3 *mAudioid3;
+
     /* Clean up assets and close game */
     void OnExitClicked();
 
@@ -58,6 +71,9 @@ private:
 
     /* Add a note and play the sequence back */
     void AddNoteAndReplay();
+
+    /* Play the tone associated with one of the buttons */
+    void PlayButtonAudio(int tone);
 
 public:
     enum MenuItem : uint8_t
@@ -73,8 +89,7 @@ public:
     // Launch from watch mainbar
     void OnLaunch();
 
-    // TTT square pressed
-    void OnTileClicked(int index);
+    void OnTileEvent(int index, struct _lv_obj_t *obj, lv_event_t event);
 
     // A menu item was clicked.
     void OnMenuClicked(MenuItem item);

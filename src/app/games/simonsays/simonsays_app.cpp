@@ -20,12 +20,14 @@
  */
 
 // Set logging level for this file
-//#define CORE_DEBUG_LEVEL 5
+#define CORE_DEBUG_LEVEL 5
 
 #include "config.h"
 
 #include "simonsays_app.h"
 #include "simonsays_icon.h"
+
+#include "hardware/sound.h"
 
 //TODO: Placeholder background image
 LV_IMG_DECLARE(bg1);
@@ -35,39 +37,19 @@ LV_IMG_DECLARE(bg1);
 static SimonSaysApp *gameInstance = 0;
 static void OnSquareUL(struct _lv_obj_t *obj, lv_event_t event)
 {
-    switch (event)
-    {
-    case (LV_EVENT_CLICKED):
-        gameInstance->OnTileClicked(0);
-        break;
-    }
+    gameInstance->OnTileEvent(0, obj, event);
 }
 static void OnSquareUR(struct _lv_obj_t *obj, lv_event_t event)
 {
-    switch (event)
-    {
-    case (LV_EVENT_CLICKED):
-        gameInstance->OnTileClicked(1);
-        break;
-    }
+    gameInstance->OnTileEvent(1, obj, event);
 }
 static void OnSquareBL(struct _lv_obj_t *obj, lv_event_t event)
 {
-    switch (event)
-    {
-    case (LV_EVENT_CLICKED):
-        gameInstance->OnTileClicked(2);
-        break;
-    }
+    gameInstance->OnTileEvent(2, obj, event);
 }
 static void OnSquareBR(struct _lv_obj_t *obj, lv_event_t event)
 {
-    switch (event)
-    {
-    case (LV_EVENT_CLICKED):
-        gameInstance->OnTileClicked(3);
-        break;
-    }
+    gameInstance->OnTileEvent(3, obj, event);
 }
 
 static void OnExit(struct _lv_obj_t *obj, lv_event_t event)
@@ -101,10 +83,11 @@ SimonSaysApp::SimonSaysApp(SimonSaysIcon *icon)
     gameInstance = this;
     mParentIcon = icon;
 
-    //Re-seed system-level RNG seed to an ungrounded pin
-    uint16_t seed = analogRead(0);
-    randomSeed(seed);
-    log_d("Setting random seed %d", seed);
+    // Directory names don't matter, but using for convenience
+    mSounds[0] = "/apps/simon/1.mp3";
+    mSounds[1] = "/apps/simon/2.mp3";
+    mSounds[2] = "/apps/simon/3.mp3";
+    mSounds[3] = "/apps/simon/4.mp3";
 
     log_d("Creating game tiles...");
     if (!AllocateAppTiles(2, 1))
@@ -239,6 +222,16 @@ SimonSaysApp::SimonSaysApp(SimonSaysIcon *icon)
         }
     }
 
+    //!Turn on the audio power
+    // log_d("Enabling audio power. This should move closer to when sound will start");
+    // TTGOClass::getWatch()->enableLDO3(true);
+    // mPlayingAudioFile = std::make_unique<AudioFileSourceSPIFFS>("/249.mp3");
+    // mAudioOut = std::make_unique<AudioOutputI2S>();
+    // mAudioOut->SetPinout(TWATCH_DAC_IIS_BCK, TWATCH_DAC_IIS_WS, TWATCH_DAC_IIS_DOUT);
+    // mMp3 = std::make_unique<AudioGeneratorMP3>();
+    // mId3 = std::make_unique<AudioFileSourceID3>(mPlayingAudioFile.get());
+    // mMp3->begin(mId3.get(), mAudioOut.get());
+
     log_d("Construction complete");
 }
 
@@ -246,6 +239,12 @@ SimonSaysApp::~SimonSaysApp()
 {
     // LVGL Objects parented to the tiles should be deleted when the tiles are destroyed.
     FreeAppTiles();
+
+    //!Turn off the audio power
+    log_d("Turning off audio power.");
+    TTGOClass::getWatch()->enableLDO3(false);
+
+    //Clear the static pointer
     gameInstance = nullptr;
 }
 
@@ -261,50 +260,6 @@ void SimonSaysApp::OnExitClicked()
     // Pass along the message for differed deletion and return to main menu
     mParentIcon->OnExitClicked();
     FreeAppTiles();
-}
-
-void SimonSaysApp::OnTileClicked(int index)
-{
-    if (index < 0 || index >= NUM_SQUARES)
-    {
-        log_e("Invaid tile number, expected 0-%d, received %d", NUM_SQUARES, index);
-        return;
-    }
-
-    if (!mPattern.size())
-    {
-        log_d("We aren't playing yet. Return to the menu screen.");
-        lv_tileview_set_tile_act(GetTileView(), 0, 0, LV_ANIM_ON);
-        return;
-    }
-
-    if (mIsDoingReplay)
-    {
-        log_d("Button pressed during replay. Ignoring it.");
-        return;
-    }
-
-    if (mCurrentNote < mPattern.size())
-    {
-        if (mPattern[mCurrentNote] == index)
-        {
-            // Passed, yay! Advance a note.
-            mCurrentNote++;
-
-            // Did they finish the round?
-            if (mCurrentNote == mPattern.size())
-            {
-                AddNoteAndReplay();
-            }
-
-            // Didn't finish the round? Wait for more input.
-            return;
-        }
-    }
-
-    // If you hit here, you didn't pass. FAIL!
-    // For now, just return to menu screen.
-    lv_tileview_set_tile_act(GetTileView(), 0, 0, LV_ANIM_ON);
 }
 
 void SimonSaysApp::OnMenuClicked(MenuItem item)
@@ -333,10 +288,41 @@ void SimonSaysApp::StartNewGame()
     AddNoteAndReplay();
 }
 
+void SimonSaysApp::PlayButtonAudio(int tone)
+{
+    if (tone < 0 || tone > NUM_SQUARES)
+    {
+        log_e("Invalid tone number %d", tone);
+        return;
+    }
+
+    log_d("Starting audio #%d, %s", tone, mSounds[tone]);
+    sound_play_spiffs_mp3(mSounds[tone]);
+    // if (mMp3 && mMp3->isRunning())
+    // {
+    //     mMp3->stop();
+    //     // Stop also closes the associated audio file, no need to do repeat it.
+    // }
+    // mPlayingAudioFile = std::make_unique<AudioFileSourceSPIFFS>(mSounds[tone]);
+
+    // if (!mMp3)
+    // {
+    //     mMp3 = std::make_unique<AudioGeneratorMP3>();
+    // }
+
+    // AudioFileSource *file = mPlayingAudioFile.get();
+    // log_d("File pointer is %p", file);
+    // AudioOutputI2S *i2s = mAudioOut.get();
+    // log_d("I2S pointer is %p", i2s);
+    // log_d("mMp3 pointer is %p", mMp3.get());
+    // log_d("Song file size: %d", file->getSize());
+    // mMp3->begin(file, i2s);
+}
+
 void SimonSaysApp::AddNoteAndReplay()
 {
     // Add the item to the list
-    mPattern.push_back(random(NUM_SQUARES));
+    mPattern.push_back(esp_random()%NUM_SQUARES);
 
     log_d("Adding note to playback, currently at %d. Pattern:", mPattern.size());
     for (int8_t &tone : mPattern)
@@ -358,6 +344,9 @@ void SimonSaysApp::AddNoteAndReplay()
     }
     mPlaybackTask = lv_task_create(PlaybackTonesTask, TONE_TIME, LV_TASK_PRIO_MID, this);
     mPlaybackTask->repeat_count = mPattern.size();
+
+    // Play the first tone
+    PlayButtonAudio(mPattern[mCurrentNote]);
 }
 
 void SimonSaysApp::OnNextTone()
@@ -375,15 +364,16 @@ void SimonSaysApp::OnNextTone()
     }
 
     // Clear the old button effect
-    lv_btn_set_state(mButtons[mPattern[mCurrentNote]], LV_BTN_STATE_PRESSED);
+    lv_btn_set_state(mButtons[mPattern[mCurrentNote]], LV_BTN_STATE_RELEASED);
 
     // Increase
     mCurrentNote++;
 
     if (mCurrentNote < mPattern.size())
     {
-        // Items remain, repeat.
+        log_d("Playing tone and grahpics for note %d (%d)", mCurrentNote, mPattern[mCurrentNote]);
         lv_btn_set_state(mButtons[mPattern[mCurrentNote]], LV_BTN_STATE_PRESSED);
+        PlayButtonAudio(mPattern[mCurrentNote]);
     }
     else
     {
@@ -391,5 +381,68 @@ void SimonSaysApp::OnNextTone()
         mCurrentNote = 0;
         mIsDoingReplay = false;
         mPlaybackTask = 0;
+
+        // // Turn off the audio playback
+        // if (mMp3 && mMp3->isRunning())
+        // {
+        //     mMp3->stop();
+        // }
+    }
+}
+
+void SimonSaysApp::OnTileEvent(int index, struct _lv_obj_t *obj, lv_event_t event)
+{
+    if (index < 0 || index >= NUM_SQUARES)
+    {
+        log_e("Invaid tile number, expected 0-%d, received %d", NUM_SQUARES, index);
+        return;
+    }
+
+    if (!mPattern.size())
+    {
+        log_d("We aren't playing yet. Return to the menu screen.");
+        lv_tileview_set_tile_act(GetTileView(), 0, 0, LV_ANIM_ON);
+        return;
+    }
+
+    switch (event)
+    {
+    case (LV_EVENT_CLICKED):
+    {
+        log_d("Clicked on button index %d", index);
+        // Handle button clicked.
+        if (mCurrentNote < mPattern.size())
+        {
+            if (mPattern[mCurrentNote] == index)
+            {
+                // Passed, yay! Advance a note.
+                mCurrentNote++;
+
+                // Did they finish the round?
+                if (mCurrentNote == mPattern.size())
+                {
+                    AddNoteAndReplay();
+                }
+
+                // Didn't finish the round? Wait for more input.
+                return;
+            }
+        }
+
+        // If you hit here, you didn't pass. FAIL!
+        // For now, just return to menu screen.
+        lv_tileview_set_tile_act(GetTileView(), 0, 0, LV_ANIM_ON);
+    }
+    break;
+    case (LV_EVENT_PRESSED):
+    {
+        log_d("Pressed event on button index %d", index);
+    }
+    break;
+    case (LV_EVENT_RELEASED):
+    {
+        log_d("Released event on button index %d", index);
+    }
+    break;
     }
 }
